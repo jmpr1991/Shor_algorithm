@@ -1,0 +1,10 @@
+README.md
+setup.py
+JMP_QC_ALGO/__init__.py
+JMP_QC_ALGO/myfunctions.py
+JMP_QC_ALGO.egg-info/PKG-INFO
+JMP_QC_ALGO.egg-info/SOURCES.txt
+JMP_QC_ALGO.egg-info/dependency_links.txt
+JMP_QC_ALGO.egg-info/top_level.txt
+test/__init__.py
+test/test_myfunctions.py
