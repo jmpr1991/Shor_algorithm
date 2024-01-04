@@ -1,4 +1,4 @@
-from JMP_QC_ALGO import myfunctions
+from jmpr_qc_algo import myfunctions
 
 def test_haversine():
     # Amsterdam to Berlin

@@ -1,4 +1,6 @@
 from math import radians, cos, sin, asin, sqrt
+import qiskit
+
 
 def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
     """
@@ -22,3 +24,6 @@ def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
     c = 2 * asin(sqrt(a))
     r = 6371 # Radius of earth in kilometers
     return c * r
+
+def qft_jmp(lon1: float, lat1: float, lon2: float, lat2: float):
+    "Calculate the Quantum Fourier Transform"
