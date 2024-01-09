@@ -1,32 +1,9 @@
-from math import radians, cos, sin, asin, sqrt
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, Aer
-from qiskit.tools.visualization import plot_histogram, plot_bloch_multivector
+#from qiskit.tools.visualization import plot_histogram, plot_bloch_multivector
 
 import numpy as np
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
-def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
-    """
-    Calculate the great circle distance between two points on the
-    earth (specified in decimal degrees), returns the distance in
-    kilometers.
-    All arguments must be of equal length.
-    :param lon1: longitude of first place
-    :param lat1: latitude of first place
-    :param lon2: longitude of second place
-    :param lat2: latitude of second place
-    :return: distance in kilometers between the two sets of coordinates
-    """
-    # Convert decimal degrees to radians
-    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-
-    # Haversine formula
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-    c = 2 * asin(sqrt(a))
-    r = 6371 # Radius of earth in kilometers
-    return c * r
 
 def qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None) -> 'classmethod':
     """
@@ -37,8 +14,8 @@ def qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None) -> 'classmethod
     :return: circuit with the QFT added
     """
 
-    # Create the circuit for the QFT depending on the list_qubit input
-    if list_qubits==None:
+    # Create the QFT circuit depending on the list_qubit input
+    if list_qubits is None:
         num_qubits = q_circuit.num_qubits
         qft_circuit = QuantumCircuit(num_qubits)
     else:
@@ -62,25 +39,87 @@ def qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None) -> 'classmethod
         qft_circuit.swap(qubit_i, num_qubits-1-qubit_i)
 
     # Compose the final circuit
-    if list_qubits==None:
+    if list_qubits is None:
         circuit = q_circuit.compose(qft_circuit, range(num_qubits))
     else:
         circuit = q_circuit.compose(qft_circuit, list_qubits)
 
     return circuit
 
-qubit_list = [0, 1, 2]
-qr = QuantumRegister(4)
-cr = ClassicalRegister(len(qubit_list))
-circuit = QuantumCircuit(qr, cr)
 
-# test case
-circuit.x([0, 2])
+def qft_optimized_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None) -> 'classmethod':
+    """
+    Calculate the Quantum Fourier Transform of the input circuit
+    and returns the circuit. This version does not use swap gates
+    :param q_circuit: input circuit
+    :param list_qubits: [optional parameter] number of qubits of the QFT circuit
+    :return: circuit with the QFT added
+    """
 
-circuit = qft_jmp(circuit, qubit_list)
-print(circuit)
+    # Create the QFT circuit depending on the list_qubit input
+    if list_qubits is None:
+        num_qubits = q_circuit.num_qubits
+        qft_circuit = QuantumCircuit(num_qubits)
+    else:
+        num_qubits = len(list_qubits)
+        qft_circuit = QuantumCircuit(num_qubits)
 
-simulator = Aer.get_backend('statevector_simulator')
+    # Build the QFT (Nielsen & Chuang section 5.1)
+    for qubit_i in range(num_qubits):
+        # implement Hadamard gate
+        qft_circuit.h(qubit_i)
 
-statevector = simulator.run(circuit).result().get_statevector()
-print(statevector)
+        # implement control phase gates
+        for qubit_j in range(qubit_i+1, num_qubits):
+            phase = 2*np.pi/(2**(qubit_j - qubit_i + 1))
+            qft_circuit.cp(phase, qubit_j, qubit_i)
+        qft_circuit.barrier()
+
+    # Compose the final circuit
+    if list_qubits is None:
+        circuit = q_circuit.compose(qft_circuit, range(num_qubits))
+    else:
+        circuit = q_circuit.compose(qft_circuit, list_qubits)
+
+    return circuit
+
+
+def inverse_qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None) -> 'classmethod':
+
+    """
+    Calculate the Quantum Fourier Transform inverse of the input circuit
+    and returns the circuit. This version does not use swap gates
+    :param q_circuit: input circuit
+    :param list_qubits: [optional parameter] number of qubits of the QFT circuit
+    :return: circuit with the QFT added
+    """
+
+    # Create the inverse QFT circuit depending on the list_qubit input
+    if list_qubits is None:
+        num_qubits = q_circuit.num_qubits
+        qft_circuit = QuantumCircuit(num_qubits)
+    else:
+        num_qubits = len(list_qubits)
+        qft_circuit = QuantumCircuit(num_qubits)
+
+    # Build the QFT (Nielsen & Chuang section 5.1)
+    for qubit_i in range(num_qubits):
+        # implement Hadamard gate
+        qft_circuit.h(qubit_i)
+
+        # implement control phase gates
+        for qubit_j in range(qubit_i + 1, num_qubits):
+            phase = 2 * np.pi / (2 ** (qubit_j - qubit_i + 1))
+            qft_circuit.cp(phase, qubit_j, qubit_i)
+        qft_circuit.barrier()
+
+    # inverse the QFT circuit
+    inverse_qft_circuit = qft_circuit.inverse()
+
+    # Compose the final circuit
+    if list_qubits is None:
+        circuit = q_circuit.compose(inverse_qft_circuit, range(num_qubits))
+    else:
+        circuit = q_circuit.compose(inverse_qft_circuit, list_qubits)
+
+    return circuit
