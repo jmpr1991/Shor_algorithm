@@ -1,5 +1,6 @@
 from jmpr_qc_algo import myfunctions
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, Aer
+from qiskit.circuit.library import QFT
 
 import numpy as np
 
@@ -138,7 +139,7 @@ def test_qft_optimized_jmp_2():
         assert np.round(statevector[i], 4) == np.round(statevector_test[i], 4)
 
 
-def test_inversed_qft_jmp_1():
+def test_inverse_qft_jmp_1():
     """
     This test check that the qft_jmp function build a QFT circuit on top of the input circuit. No list of qubits is
     is provided in this test
@@ -162,11 +163,11 @@ def test_inversed_qft_jmp_1():
         assert np.round(statevector[i], 4) == np.round(statevector_test[i], 4)
 
 
-def test_inversed_qft_jmp_2():
+def test_inverse_qft_jmp_2():
     """
-       This test check that the qft_jmp function build a QFT circuit on top of the input circuit. A list of Qubits is
-       provided in this test
-       """
+    This test check that the inverse_qft_jmp function build an inverse QFT circuit on top of the input circuit. A list
+    of Qubits is provided in this test
+    """
     qubit_list = [0, 1, 2]
     qr = QuantumRegister(5)
     cr = ClassicalRegister(len(qubit_list))
@@ -185,3 +186,21 @@ def test_inversed_qft_jmp_2():
 
     for i in range(len(statevector_test)):
         assert np.round(statevector[i], 4) == np.round(statevector_test[i], 4)
+
+
+def test_phase_estimation_jmp():
+    """
+    This test check the phase estimation function works properly
+    """
+
+    # test case
+    qr = QuantumRegister(3)
+    phi_reg = QuantumRegister(1)
+    phase = 1/8
+
+    # Build the circuit
+    circuit = myfunctions.phase_estimation_jmp(qr, phi_reg, phase)
+
+    # simulation of the state vector
+    simulator = Aer.get_backend('qasm_simulator')
+    results = simulator.run(circuit).result().get_counts()

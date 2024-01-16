@@ -1,8 +1,9 @@
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, Aer
-#from qiskit.tools.visualization import plot_histogram, plot_bloch_multivector
+from qiskit.tools.visualization import plot_histogram, plot_bloch_multivector
+from qiskit.circuit.library import QFT
 
 import numpy as np
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 
 def qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None) -> 'classmethod':
@@ -123,3 +124,68 @@ def inverse_qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None) -> 'cla
         circuit = q_circuit.compose(inverse_qft_circuit, list_qubits)
 
     return circuit
+
+
+def phase_estimation_jmp(estimator_register_size: 'int', phi_register_size: 'int', phase: 'float') -> 'classmethod':
+
+    # Create the Quantum Circuit
+    estimator_register = QuantumRegister(estimator_register_size, name='reg')
+    classical_register = ClassicalRegister(estimator_register_size, name='meas')
+    phi_register = QuantumRegister(phi_register_size, name='phi')
+
+    circuit = QuantumCircuit(estimator_register, phi_register, classical_register)
+
+    # Initialization of the quantum register with H gates
+    circuit.h(estimator_register)
+    circuit.x(phi_register)
+
+    # Phase estimation procedure
+    step = 0
+    for control_qubit in range(estimator_register_size):
+
+        for exponent in range(2**step):
+            circuit.cp(2*np.pi * phase, estimator_register[control_qubit], phi_register)
+
+        step = step + 1
+
+    # add the inverse QFT
+    phase_estimator_circuit = inverse_qft_jmp(circuit, estimator_register)
+    phase_estimator_circuit.barrier()
+
+    # Measure the estimation register
+    phase_estimator_circuit.measure(estimator_register, classical_register)
+
+    return phase_estimator_circuit
+
+
+circuit_p = phase_estimation_jmp(3, 1, 1/8)
+print(circuit_p)
+
+# simulation of the state vector
+simulator = Aer.get_backend('qasm_simulator')
+results = simulator.run(circuit_p).result().get_counts()
+print(sorted(results)[-1])
+
+#####
+qr = QuantumRegister(3)
+cr = ClassicalRegister(3)
+circuit = QuantumCircuit(qr, cr)
+
+# test case
+circuit.x([0, 1])
+
+circuit = qft_jmp(circuit)
+
+simulator = Aer.get_backend('statevector_simulator')
+statevector = simulator.run(circuit).result().get_statevector()
+print(statevector)
+
+circuit_test = QuantumCircuit(3)
+circuit_test.x([0, 1])
+circuit_test = circuit_test.compose(QFT(3))
+print(circuit_test.decompose())
+print(circuit)
+
+
+statevector_test = simulator.run(circuit_test.decompose()).result().get_statevector()
+print(statevector_test)
