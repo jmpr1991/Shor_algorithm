@@ -6,12 +6,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None) -> 'classmethod':
+def qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None, qft_inverse: 'bool' = False) -> 'classmethod':
     """
     Calculate the Quantum Fourier Transform of the input circuit
     and returns the circuit
     :param q_circuit: input circuit
     :param list_qubits: [optional parameter] number of qubits of the QFT circuit
+    :param qft_inverse: [optional parameter] apply the inverse of the QFT is it is set to True. It is false by default
     :return: circuit with the QFT added
     """
 
@@ -29,7 +30,7 @@ def qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None) -> 'classmethod
         qft_circuit.h(qubit_i)
 
         # implement control phase gates
-        for qubit_j in (range(qubit_i)):
+        for qubit_j in reversed(range(qubit_i)):
             phase = 2*np.pi/(2**(qubit_i - qubit_j + 1))
             qft_circuit.cp(phase, qubit_j, qubit_i)
         qft_circuit.barrier()
@@ -39,48 +40,17 @@ def qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None) -> 'classmethod
     for qubit_i in range(int(n_qubits)):
         qft_circuit.swap(qubit_i, num_qubits-1-qubit_i)
 
-    # Compose the final circuit
-    if list_qubits is None:
-        circuit = q_circuit.compose(qft_circuit, range(num_qubits))
-    else:
-        circuit = q_circuit.compose(qft_circuit, list_qubits)
-
-    return circuit
-
-
-def qft_optimized_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None) -> 'classmethod':
-    """
-    Calculate the Quantum Fourier Transform of the input circuit
-    and returns the circuit. This version does not use swap gates
-    :param q_circuit: input circuit
-    :param list_qubits: [optional parameter] number of qubits of the QFT circuit
-    :return: circuit with the QFT added
-    """
-
-    # Create the QFT circuit depending on the list_qubit input
-    if list_qubits is None:
-        num_qubits = q_circuit.num_qubits
-        qft_circuit = QuantumCircuit(num_qubits)
-    else:
-        num_qubits = len(list_qubits)
-        qft_circuit = QuantumCircuit(num_qubits)
-
-    # Build the QFT (Nielsen & Chuang section 5.1)
-    for qubit_i in range(num_qubits):
-        # implement Hadamard gate
-        qft_circuit.h(qubit_i)
-
-        # implement control phase gates
-        for qubit_j in range(qubit_i+1, num_qubits):
-            phase = 2*np.pi/(2**(qubit_j - qubit_i + 1))
-            qft_circuit.cp(phase, qubit_j, qubit_i)
-        qft_circuit.barrier()
+    # Make the qft inverse if requested
+    if qft_inverse is True:
+        qft_circuit = qft_circuit.inverse()
 
     # Compose the final circuit
     if list_qubits is None:
         circuit = q_circuit.compose(qft_circuit, range(num_qubits))
     else:
         circuit = q_circuit.compose(qft_circuit, list_qubits)
+
+
 
     return circuit
 
@@ -149,7 +119,7 @@ def phase_estimation_jmp(estimator_register_size: 'int', phi_register_size: 'int
         step = step + 1
 
     # add the inverse QFT
-    phase_estimator_circuit = inverse_qft_jmp(circuit, estimator_register)
+    phase_estimator_circuit = qft_jmp(circuit, estimator_register, qft_inverse=True)
     phase_estimator_circuit.barrier()
 
     # Measure the estimation register
@@ -158,34 +128,3 @@ def phase_estimation_jmp(estimator_register_size: 'int', phi_register_size: 'int
     return phase_estimator_circuit
 
 
-circuit_p = phase_estimation_jmp(3, 1, 1/8)
-print(circuit_p)
-
-# simulation of the state vector
-simulator = Aer.get_backend('qasm_simulator')
-results = simulator.run(circuit_p).result().get_counts()
-print(sorted(results)[-1])
-
-#####
-qr = QuantumRegister(3)
-cr = ClassicalRegister(3)
-circuit = QuantumCircuit(qr, cr)
-
-# test case
-circuit.x([0, 1])
-
-circuit = qft_jmp(circuit)
-
-simulator = Aer.get_backend('statevector_simulator')
-statevector = simulator.run(circuit).result().get_statevector()
-print(statevector)
-
-circuit_test = QuantumCircuit(3)
-circuit_test.x([0, 1])
-circuit_test = circuit_test.compose(QFT(3))
-print(circuit_test.decompose())
-print(circuit)
-
-
-statevector_test = simulator.run(circuit_test.decompose()).result().get_statevector()
-print(statevector_test)
