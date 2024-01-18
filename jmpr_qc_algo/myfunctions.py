@@ -85,3 +85,35 @@ def phase_estimation_jmp(estimator_register_size: 'int', phi_register_size: 'int
     return phase_estimator_circuit
 
 
+def phase_estimation_operator_jmp(estimator_circuit: 'classmethod', phi_circuit: 'classmethod', operator: 'float') \
+        -> 'classmethod':
+
+    # Create the Quantum Circuit
+    estimator_qubits = estimator_circuit.num_qubits
+    phi_qubits = phi_circuit.num_qubits
+    circuit = QuantumCircuit(estimator_qubits + phi_qubits, estimator_qubits)
+
+    circuit = circuit.compose(estimator_circuit, range(estimator_qubits))
+    circuit = circuit.compose(phi_qubits, range(estimator_qubits, estimator_qubits + phi_qubits))
+
+    # Initialization of the quantum register with H gates
+    circuit.h(range(estimator_qubits))
+    circuit.x(range(estimator_qubits, estimator_qubits + phi_qubits))
+
+    # Phase estimation procedure
+    step = 0
+    for control_qubit in range(estimator_register_size):
+
+        for exponent in range(2**step):
+            circuit.cp(2*np.pi * phase, estimator_register[control_qubit], phi_register)
+
+        step = step + 1
+
+    # add the inverse QFT
+    phase_estimator_circuit = qft_jmp(circuit, estimator_register, qft_inverse=True)
+    phase_estimator_circuit.barrier()
+
+    # Measure the estimation register
+    phase_estimator_circuit.measure(estimator_register, classical_register)
+
+    return phase_estimator_circuit

@@ -146,7 +146,7 @@ def test_phase_estimation_jmp_2():
     """
 
     # test case phase = 1/3
-    circuit_size = 3
+    circuit_size = 5
     phi_size = 1
     phase = 1/3
 
