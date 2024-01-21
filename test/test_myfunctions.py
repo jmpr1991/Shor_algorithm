@@ -183,10 +183,15 @@ def test_phase_estimation_operator_jmp():
     circuit_1 = myfunctions.phase_estimation_operator_jmp(3, Operator(TGate()))
     circuit_2 = myfunctions.phase_estimation_operator_jmp(3, Operator(SGate()))
 
+    phase = 1/3
+    operator_test = Operator([[1, 0], [0, np.exp(2 * np.pi * 1j * phase)]])
+    circuit_3 = myfunctions.phase_estimation_operator_jmp(3, operator_test)
+
     # simulation of the state vector
     simulator = Aer.get_backend('qasm_simulator')
     results_1 = simulator.run(circuit_1.decompose(reps=6)).result().get_counts()
     results_2 = simulator.run(circuit_2.decompose(reps=6)).result().get_counts()
+    results_3 = simulator.run(circuit_3.decompose(reps=6)).result().get_counts()
 
     # post-process of the results
     keys_1 = list(results_1.keys())
@@ -203,5 +208,19 @@ def test_phase_estimation_operator_jmp():
 
     phase_computed_2 = int(keys_2[max_index_2], 2) / 2 ** 3
 
-    assert phase_computed_1 == 1/8 , phase_computed_2 == 1/4
+    keys_3 = list(results_3.keys())
+    values_3 = list(results_3.values())
+    sorted_values_3 = sorted(values_3)
+    max_index_3 = values_3.index(sorted_values_3[-1])
+    second_max_index = values_3.index(sorted_values_3[-2])
+
+    phase_computed_3 = (int(keys_3[max_index_3], 2) / 2 ** 3 + int(keys_3[second_max_index], 2)
+                      / 2 ** 3) / 2
+
+    assert phase_computed_1 == 1/8, phase_computed_2 == 1/4
+
+    if abs(phase - phase_computed_3) <= 1 / 3**2:
+        assert True
+    else:
+        assert False
 
