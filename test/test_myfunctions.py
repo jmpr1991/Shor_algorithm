@@ -1,6 +1,7 @@
 from jmpr_qc_algo import myfunctions
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, Aer
-from qiskit.circuit.library import QFT
+from qiskit.circuit.library import QFT, TGate, SGate
+from qiskit.quantum_info.operators import Operator
 
 import numpy as np
 
@@ -174,3 +175,33 @@ def test_phase_estimation_jmp_2():
         assert True
     else:
         assert False
+
+
+def test_phase_estimation_operator_jmp():
+
+    # Build the circuit
+    circuit_1 = myfunctions.phase_estimation_operator_jmp(3, Operator(TGate()))
+    circuit_2 = myfunctions.phase_estimation_operator_jmp(3, Operator(SGate()))
+
+    # simulation of the state vector
+    simulator = Aer.get_backend('qasm_simulator')
+    results_1 = simulator.run(circuit_1.decompose(reps=6)).result().get_counts()
+    results_2 = simulator.run(circuit_2.decompose(reps=6)).result().get_counts()
+
+    # post-process of the results
+    keys_1 = list(results_1.keys())
+    values_1 = list(results_1.values())
+    sorted_values_1 = sorted(values_1)
+    max_index_1 = values_1.index(sorted_values_1[-1])
+
+    phase_computed_1 = int(keys_1[max_index_1], 2) / 2 ** 3
+
+    keys_2 = list(results_2.keys())
+    values_2 = list(results_2.values())
+    sorted_values_2 = sorted(values_2)
+    max_index_2 = values_2.index(sorted_values_2[-1])
+
+    phase_computed_2 = int(keys_2[max_index_2], 2) / 2 ** 3
+
+    assert phase_computed_1 == 1/8 , phase_computed_2 == 1/4
+

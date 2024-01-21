@@ -1,7 +1,7 @@
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, Aer
 from qiskit.quantum_info.operators import Operator
 from qiskit.tools.visualization import plot_histogram, plot_bloch_multivector
-from qiskit.circuit.library import QFT
+from qiskit.circuit.library import QFT, TGate, SGate
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -55,6 +55,13 @@ def qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None, qft_inverse: 'b
 
 
 def phase_estimation_jmp(estimator_register_size: 'int', phi_register_size: 'int', phase: 'float') -> 'classmethod':
+    """
+    This function has been built to experiment before creating the function bellow
+    :param estimator_register_size:
+    :param phi_register_size:
+    :param phase:
+    :return:
+    """
 
     # Create the Quantum Circuit
     estimator_register = QuantumRegister(estimator_register_size, name='reg')
@@ -86,27 +93,40 @@ def phase_estimation_jmp(estimator_register_size: 'int', phi_register_size: 'int
     return phase_estimator_circuit
 
 
-def phase_estimation_operator_jmp(estimator_circuit: 'classmethod', phi_circuit: 'classmethod', operator: 'float') \
-        -> 'classmethod':
+def phase_estimation_operator_jmp(estimator_qubits: 'int', operator: 'class list') -> 'classmethod':
+    """
+    This function computes the phase estimation of the input operator provided a number of qubits for the estimator
+    :param estimator_qubits: number of qubits to estimate the phase/eigenvalue
+    :param operator: operator to be used in the phase estimation algorithm
+    :return: phase_estimation_circuit
+    """
 
     # Create the Quantum Circuit
-    estimator_qubits = estimator_circuit.num_qubits
-    phi_qubits = phi_circuit.num_qubits
-    circuit = QuantumCircuit(estimator_qubits + phi_qubits, estimator_qubits)
+    phi_qubits = np.log2(operator.dim[0])
 
-    circuit = circuit.compose(estimator_circuit, range(estimator_qubits))
-    circuit = circuit.compose(phi_qubits, range(estimator_qubits, estimator_qubits + phi_qubits))
+    estimator_register = QuantumRegister(estimator_qubits, name='reg')
+    classical_register = ClassicalRegister(estimator_qubits, name='meas')
+    phi_register = QuantumRegister(phi_qubits, name='phi')
+
+    circuit = QuantumCircuit(estimator_register, phi_register, classical_register)
 
     # Initialization of the quantum register with H gates
-    circuit.h(range(estimator_qubits))
-    circuit.x(range(estimator_qubits, estimator_qubits + phi_qubits))
+    circuit.h(estimator_register)
+    circuit.x(phi_register[0])
 
     # Phase estimation procedure
     step = 0
     for control_qubit in range(estimator_qubits):
 
-        for exponent in range(2**step):
-            circuit.cp(2*np.pi * phase, estimator_register[control_qubit], phi_register)
+        # create controlled operator
+        exponential_operator = operator ** (2 ** control_qubit)
+        control_operator = exponential_operator.to_instruction()
+        control_operator.name = f"U^2^{control_qubit}"
+        control_operator = control_operator.control(1)
+
+
+        # append the control operator
+        circuit.append(control_operator, [control_qubit, phi_register])
 
         step = step + 1
 
@@ -177,5 +197,13 @@ def modular_exponentiation_jmp(number_to_factor: 'int', number_module: 'int') ->
 
 
 operators, circuits = modular_exponentiation_jmp(3, 35)
-print(type(operators))
-print(circuits[0])
+print(np.log2(np.size(operators[0])))
+print(operators[0]*2)
+
+print(TGate())
+print(Operator(SGate()).dim[0])
+circuit = phase_estimation_operator_jmp(3, Operator(SGate()))
+print(circuit)
+simulator = Aer.get_backend('qasm_simulator')
+results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
+print(results)
