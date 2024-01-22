@@ -124,7 +124,6 @@ def phase_estimation_operator_jmp(estimator_qubits: 'int', operator: 'class list
         control_operator.name = f"U^2^{control_qubit}"
         control_operator = control_operator.control(1)
 
-
         # append the control operator
         circuit.append(control_operator, [control_qubit, phi_register])
 
@@ -196,14 +195,95 @@ def modular_exponentiation_jmp(number_to_factor: 'int', number_module: 'int') ->
     return operators, circuits
 
 
-operators, circuits = modular_exponentiation_jmp(3, 35)
-print(np.log2(np.size(operators[0])))
-print(operators[0]*2)
+def plain_adder(a: 'int', b: 'int'):
 
-print(Operator([[1, 0], [0, np.exp(2 * np.pi * 1j * 1/3)]]))
-print(Operator(SGate()).dim[0])
-circuit = phase_estimation_operator_jmp(3, Operator([[1, 0], [0, np.exp(2 * np.pi * 1j * 1/3)]]))
-print(circuit)
+    # compute size of the inputs numbers in binary
+    a_bin = bin(a)
+    b_bin = bin(b)
+    a_bit_size = len(a_bin)
+    b_bit_size = len(b_bin)
+
+    register_size = max(a_bit_size - 2, b_bit_size - 2)
+
+    # build the circuit
+    a_register = QuantumRegister(register_size, name='a')
+    b_register = QuantumRegister(register_size + 1, name='b')
+    carry_register = QuantumRegister(register_size, name='c')
+
+    circuit = QuantumCircuit(a_register, b_register, carry_register)
+
+    # build the numbers inside the circuit
+    qubit = 0
+    for iter in reversed(range(a_bit_size)):
+
+        if a_bin[iter] == '1':
+            circuit.x(a_register[qubit])
+        elif a_bin[iter] == 'b':
+            break
+        qubit += 1
+
+    qubit = 0
+    for iter in reversed(range(b_bit_size)):
+        if b_bin[iter] == '1':
+            circuit.x(b_register[qubit])
+        elif b_bin[iter] == 'b':
+            break
+        qubit += 1
+
+    # create the basic operators for the addition
+    carry_circuit = QuantumCircuit(4)
+    carry_circuit.ccx(1, 2, 3)
+    carry_circuit.cx(1, 2)
+    carry_circuit.ccx(0, 2, 3)
+
+    carry_operator = Operator(carry_circuit).to_instruction()
+    carry_operator.name = "carry"
+    carry_operator_inverse = Operator(carry_circuit.inverse()).to_instruction()
+    carry_operator_inverse.name = "carry-I"
+
+    sum_circuit = QuantumCircuit(3)
+    sum_circuit.cx(1, 2)
+    sum_circuit.cx(0, 2)
+
+    sum_operator = Operator(sum_circuit).to_instruction()
+    sum_operator.name = "sum"
+
+    for iter in range(register_size):
+        if iter < register_size - 1:
+            circuit.append(carry_operator, [carry_register[iter], a_register[iter], b_register[iter], carry_register[iter+1]])
+        else:
+            circuit.append(carry_operator, [carry_register[iter], a_register[iter], b_register[iter], b_register[iter+1]])
+
+    circuit.cx(a_register[register_size - 1], b_register[register_size - 1])
+    circuit.append(sum_operator, [carry_register[register_size - 1], a_register[register_size - 1], b_register[register_size - 1]])
+
+    for iter in reversed(range(register_size -1)):
+
+        circuit.append(carry_operator_inverse, [carry_register[iter], a_register[iter], b_register[iter], carry_register[iter+1]])
+        circuit.append(sum_operator, [carry_register[iter], a_register[iter], b_register[iter]])
+
+    plain_adder_operator = Operator(circuit).to_instruction()
+    return circuit, plain_adder_operator
+
+def adder_modulo(a: 'int', b: 'int', n: 'int'):
+
+    n_bin = bin(n)
+    n_bit_size = len(n_bin)
+
+    adder_circuit = plain_adder(a, b)
+    adder_circuit_inverse = adder_circuit.inverse()
+
+    # build the circuit
+    a_register = adder_circuit.qregs[0]
+    b_register = adder_circuit.qregs[1]
+    carry_register = adder_circuit.qregs[2]
+    n_register = QuantumRegister(n_bit_size - 2, name= 'n')
+    zero_bit_register = QuantumRegister(0, name='0')
+
+    circuit = QuantumCircuit(a_register, b_register, carry_register, n_register, zero_bit_register)
+
+circuit, operator = plain_adder(3, 3)
+print(circuit.qregs[0])
 simulator = Aer.get_backend('qasm_simulator')
 results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
 print(results)
