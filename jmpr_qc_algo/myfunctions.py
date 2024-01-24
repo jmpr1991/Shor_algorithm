@@ -325,6 +325,11 @@ def drappper_adder(a: 'int', b: 'int'):
 
 
 def modular_adder(a: 'int', b: 'int', n: 'int'):
+
+    if b >= n:
+        print("b should be less than n!!")
+        assert False
+
     # compute size of the inputs numbers in binary
     a_bin = bin(a)
     b_bin = bin(b)
@@ -339,6 +344,7 @@ def modular_adder(a: 'int', b: 'int', n: 'int'):
     c_register = QuantumRegister(2, name='c')
     aux_register = QuantumRegister(1, name='|0>')
     circuit = QuantumCircuit(c_register, b_register, aux_register)
+    circuit.x(c_register)
 
     # build "b" inside the circuit
     qubit = 0
@@ -354,51 +360,58 @@ def modular_adder(a: 'int', b: 'int', n: 'int'):
 
     # create the modular_adder circuit
     _, operator_adder_a, operator_adder_inverse_a = drappper_adder(a, b)
-    control_operator_adder_a = operator_adder_a.control(2)
-    control_operator_adder_inverse_a = operator_adder_inverse_a.control(2)
+    #control_operator_adder_a = operator_adder_a.control(2)
+    #control_operator_adder_inverse_a = operator_adder_inverse_a.control(2)
     _, operator_adder_n, operator_adder_inverse_n = drappper_adder(n, b)
     control_operator_adder_n = operator_adder_n.control(1)
 
-    modular_adder_circuit = QuantumCircuit(c_register, b_register, aux_register)
-    modular_adder_circuit.x(c_register)
-    modular_adder_circuit.append(control_operator_adder_a, c_register[:] + b_register[:])
+    modular_adder_circuit = QuantumCircuit(b_register, aux_register)
+    modular_adder_circuit.append(operator_adder_a, b_register)
     modular_adder_circuit.append(operator_adder_inverse_n, b_register)
     modular_adder_circuit = modular_adder_circuit.compose(QFT(num_qubits=register_size, inverse=True, do_swaps=False),
                                                           b_register)
     modular_adder_circuit.cx(b_register[-1], aux_register)
     modular_adder_circuit = modular_adder_circuit.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
     modular_adder_circuit.append(control_operator_adder_n, aux_register[:] + b_register[:])
-    modular_adder_circuit.append(control_operator_adder_inverse_a, c_register[:] + b_register[:])
+    modular_adder_circuit.append(operator_adder_inverse_a, b_register)
     modular_adder_circuit = modular_adder_circuit.compose(QFT(num_qubits=register_size, inverse=True, do_swaps=False),
                                                           b_register)
     modular_adder_circuit.x(b_register[-1])
     modular_adder_circuit.cx(b_register[-1], aux_register)
     modular_adder_circuit.x(b_register[-1])
     modular_adder_circuit = modular_adder_circuit.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
-    modular_adder_circuit.append(control_operator_adder_a, c_register[:] + b_register[:])
+    modular_adder_circuit.append(operator_adder_a, b_register)
 
     # create modular adder operator
     modular_adder_operator = Operator(modular_adder_circuit).to_instruction()
     modular_adder_operator.name = 'mod_adder'
     operator_adder_inverse = Operator(modular_adder_circuit.inverse()).to_instruction()
     operator_adder_inverse.name = 'inverse_mod_adder'
+    control_modular_adder_operator = modular_adder_operator.control(2)
 
     #compose the final circuit
-    circuit = circuit.compose(modular_adder_circuit)
+    circuit.append(control_modular_adder_operator, c_register[:] + b_register[:] + aux_register[:])
 
     return circuit, modular_adder_operator, operator_adder_inverse
 
 
-circuit, operator, operator_inverse = drappper_adder(11, 4)
-circuit = circuit.compose(QFT(4, inverse=True, do_swaps=False))
+def controlled_multiplier(a: 'int', b: 'int', n: 'int', x: 'int'):
+
+    return
+
+a=5
+b=9
+n=10
+circuit, operator, operator_inverse = drappper_adder(a, b)
+circuit = circuit.compose(QFT(5, inverse=True, do_swaps=False))
 circuit.measure_all()
 print(circuit)
 simulator = Aer.get_backend('qasm_simulator')
 results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
 print(results)
 
-circuit, operator, operator_inverse = modular_adder(2, 4, 5)
-circuit = circuit.compose(QFT(4, inverse=True, do_swaps=False), range(2, 4+2))
+circuit, operator, operator_inverse = modular_adder(a, b, n)
+circuit = circuit.compose(QFT(5, inverse=True, do_swaps=False), range(2, 5+2))
 circuit.measure_all()
 
 print(circuit)
