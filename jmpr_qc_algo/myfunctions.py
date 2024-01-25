@@ -4,10 +4,12 @@ from qiskit.tools.visualization import plot_histogram, plot_bloch_multivector
 from qiskit.circuit.library import QFT, TGate, SGate
 
 import numpy as np
+from itertools import chain
 import matplotlib.pyplot as plt
 
 
-def qft_jmp(q_circuit: 'classmethod', list_qubits: 'int' = None, qft_inverse: 'bool' = False) -> 'classmethod':
+def qft_jmp(q_circuit: 'QuantumCircuit', list_qubits: 'QuantumRegister' = None, qft_inverse: 'bool' = False) \
+        -> 'classmethod':
     """
     Calculate the Quantum Fourier Transform of the input circuit
     and returns the circuit
@@ -266,7 +268,7 @@ def plain_adder(a: 'int', b: 'int'):
     return circuit, plain_adder_operator
 
 
-def drappper_adder(a: 'int', b: 'int'):
+def drappper_adder(a: 'int', b: 'int', n = 0):
     """
     This function add two integers in the b register using the fourier basis (Draper adder [addition on a Quantum Computer])
     :param a: integer 1
@@ -277,10 +279,12 @@ def drappper_adder(a: 'int', b: 'int'):
     # compute size of the inputs numbers in binary
     a_bin = bin(a)
     b_bin = bin(b)
+    n_bin = bin(n)
     a_bit_size = len(a_bin)
     b_bit_size = len(b_bin)
+    n_bin_size = len(n_bin)
 
-    register_size = b_bit_size - 2 + 1
+    register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1, n_bin_size - 2 + 1)
 
     b_register = QuantumRegister(register_size, name='b')
     circuit = QuantumCircuit(b_register)
@@ -338,13 +342,13 @@ def modular_adder(a: 'int', b: 'int', n: 'int'):
     b_bit_size = len(b_bin)
     n_bit_size = len(n_bin)
 
-    register_size = b_bit_size - 2 + 1
+    register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1, n_bit_size - 2 + 1)
 
     b_register = QuantumRegister(register_size, name='b')
-    c_register = QuantumRegister(2, name='c')
+    #c_register = QuantumRegister(2, name='c')
     aux_register = QuantumRegister(1, name='|0>')
-    circuit = QuantumCircuit(c_register, b_register, aux_register)
-    circuit.x(c_register)
+    circuit = QuantumCircuit(b_register, aux_register)
+    #circuit.x(c_register)
 
     # build "b" inside the circuit
     qubit = 0
@@ -359,7 +363,7 @@ def modular_adder(a: 'int', b: 'int', n: 'int'):
     circuit = circuit.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
 
     # create the modular_adder circuit
-    _, operator_adder_a, operator_adder_inverse_a = drappper_adder(a, b)
+    _, operator_adder_a, operator_adder_inverse_a = drappper_adder(a, b, n)
     #control_operator_adder_a = operator_adder_a.control(2)
     #control_operator_adder_inverse_a = operator_adder_inverse_a.control(2)
     _, operator_adder_n, operator_adder_inverse_n = drappper_adder(n, b)
@@ -387,34 +391,179 @@ def modular_adder(a: 'int', b: 'int', n: 'int'):
     modular_adder_operator.name = 'mod_adder'
     operator_adder_inverse = Operator(modular_adder_circuit.inverse()).to_instruction()
     operator_adder_inverse.name = 'inverse_mod_adder'
-    control_modular_adder_operator = modular_adder_operator.control(2)
+    #control_modular_adder_operator = modular_adder_operator.control(2)
 
     #compose the final circuit
-    circuit.append(control_modular_adder_operator, c_register[:] + b_register[:] + aux_register[:])
+    circuit.append(modular_adder_operator, b_register[:] + aux_register[:])
 
     return circuit, modular_adder_operator, operator_adder_inverse
 
 
 def controlled_multiplier(a: 'int', b: 'int', n: 'int', x: 'int'):
 
-    return
+    # compute size of the inputs numbers in binary
+    a_bin = bin(a)
+    b_bin = bin(b)
+    n_bin = bin(n)
+    x_bin = bin(x)
+    a_bit_size = len(a_bin)
+    b_bit_size = len(b_bin)
+    n_bit_size = len(n_bin)
+    x_bit_size = len(x_bin)
 
-a=5
-b=9
-n=10
-circuit, operator, operator_inverse = drappper_adder(a, b)
-circuit = circuit.compose(QFT(5, inverse=True, do_swaps=False))
+    # one additional qubit added to the register
+    register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1, n_bit_size - 2 + 1)
+
+    b_register = QuantumRegister(register_size, name='b')
+    #c_register = QuantumRegister(1, name='c')
+    x_register = QuantumRegister(x_bit_size - 2, name='x')
+    aux_register = QuantumRegister(1, name='|0>')
+    circuit = QuantumCircuit(x_register, b_register, aux_register)
+    #circuit.x(c_register)
+
+    # build "x" inside the circuit
+    qubit = 0
+    for iter in reversed(range(x_bit_size)):
+        if x_bin[iter] == '1':
+            circuit.x(x_register[qubit])
+        elif x_bin[iter] == 'b':
+            break
+        qubit += 1
+
+    # build "b" inside the circuit
+    qubit = 0
+    for iter in reversed(range(b_bit_size)):
+        if b_bin[iter] == '1':
+            circuit.x(b_register[qubit])
+        elif b_bin[iter] == 'b':
+            break
+        qubit += 1
+
+
+    # build the multiplier circuit
+    control_multiplier = QuantumCircuit(x_register, b_register, aux_register)
+    control_multiplier = control_multiplier.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
+
+    for iter in range(x_bit_size - 2):
+        # compute the modular adder operator
+        _, modular_adder_operator, _ = modular_adder(2**iter * a, b, n)
+
+        control_modular_adder_operator = modular_adder_operator.control(1)
+
+        control_multiplier.append(control_modular_adder_operator, [iter, *range(x_bit_size-2, x_bit_size-2 + register_size + 1)])
+
+    control_multiplier = control_multiplier.compose(QFT(num_qubits=register_size, inverse=True, do_swaps=False),
+                                                          b_register)
+
+    multiplier_operator = Operator(control_multiplier).to_instruction()
+    multiplier_operator.name = 'C-mult(a)'
+    multiplier_operator_inverse = Operator(control_multiplier.inverse()).to_instruction()
+    multiplier_operator_inverse.name = 'C-mult(a)-inv'
+
+
+    #compose the final circuit
+    circuit = circuit.compose(control_multiplier, x_register[:] + b_register[:] + aux_register[:])
+
+    return circuit, multiplier_operator, multiplier_operator_inverse
+
+def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
+
+    # compute size of the inputs numbers in binary
+    a_bin = bin(a)
+    b_bin = bin(b)
+    n_bin = bin(n)
+    x_bin = bin(x)
+    a_bit_size = len(a_bin)
+    b_bit_size = len(b_bin)
+    n_bit_size = len(n_bin)
+    x_bit_size = len(x_bin)
+
+    # one additional qubit added to the register
+    register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1, n_bit_size - 2 + 1)
+
+    b_register = QuantumRegister(register_size, name='b')
+    x_register = QuantumRegister(x_bit_size - 2, name='x')
+    aux_register = QuantumRegister(1, name='|0>')
+    circuit = QuantumCircuit(x_register, b_register, aux_register)
+
+    # build "x" inside the circuit
+    qubit = 0
+    for iter in reversed(range(x_bit_size)):
+        if x_bin[iter] == '1':
+            circuit.x(x_register[qubit])
+        elif x_bin[iter] == 'b':
+            break
+        qubit += 1
+
+    # build "b" inside the circuit
+    qubit = 0
+    for iter in reversed(range(b_bit_size)):
+        if b_bin[iter] == '1':
+            circuit.x(b_register[qubit])
+        elif b_bin[iter] == 'b':
+            break
+        qubit += 1
+
+
+    # build the U circuit
+    U_a = QuantumCircuit(x_register, b_register, aux_register)
+
+    _, c_mult, c_mult_inv = controlled_multiplier(a, b, n, x)
+
+    U_a.append(c_mult, x_register[:] + b_register[:] + aux_register[:])
+
+    # apply swap gate
+    for iter in range(x_bit_size - 2):
+        U_a.swap(x_register[iter], b_register[register_size - (x_bit_size - 2) + iter])
+    for iter in range(register_size - (x_bit_size - 2)):
+        U_a.swap(iter, iter + (x_bit_size - 2))
+    U_a.swap(register_size - (x_bit_size - 2), register_size - (x_bit_size - 2) + 1)
+
+    U_a.append(c_mult_inv, x_register[:] + b_register[:] + aux_register[:])
+
+    circuit = circuit.compose(U_a, x_register[:] + b_register[:] + aux_register[:])
+
+    return circuit
+
+a=7
+b=0
+b_size = len(bin(b)) - 2 + 1
+n=15
+n_size = len(bin(n)) - 2 + 1
+size = max(b_size, n_size)
+x=3
+
+######### draper ###########
+circuit, operator, operator_inverse = drappper_adder(a, b, n)
+circuit = circuit.compose(QFT(size, inverse=True, do_swaps=False))
 circuit.measure_all()
 print(circuit)
 simulator = Aer.get_backend('qasm_simulator')
 results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
 print(results)
 
+######## modular adder #######
 circuit, operator, operator_inverse = modular_adder(a, b, n)
-circuit = circuit.compose(QFT(5, inverse=True, do_swaps=False), range(2, 5+2))
+circuit = circuit.compose(QFT(size, inverse=True, do_swaps=False), range(size))
 circuit.measure_all()
 
 print(circuit)
-simulator = Aer.get_backend('qasm_simulator')
+results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
+print(results)
+
+
+###### multiplier #########
+circuit, operator, operator_inverse = controlled_multiplier(a, b, n, x)
+circuit.measure_all()
+
+print(circuit)
+results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
+print(results)
+
+###### U #########
+circuit = U_a(a, b, n, x)
+circuit.measure_all()
+
+print(circuit)
 results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
 print(results)

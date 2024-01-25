@@ -224,3 +224,23 @@ def test_phase_estimation_operator_jmp():
     else:
         assert False
 
+
+def test_draper_adder():
+    """
+    This function test Draper adder
+    """
+    # test parameters
+    a = 5
+    b = 9
+
+    # build circuit
+    circuit, operator, operator_inverse = myfunctions.drappper_adder(a, b)
+    circuit = circuit.compose(QFT(5, inverse=True, do_swaps=False))
+    circuit.measure_all()
+
+    simulator = Aer.get_backend('qasm_simulator')
+    results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
+
+    keys = list(results.keys())
+
+    assert int(keys[-1], 2) == a + b
