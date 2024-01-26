@@ -519,20 +519,20 @@ print(results)
 
 
 ###### multiplier #########
-#circuit, operator, operator_inverse = controlled_multiplier(a, b, n, x)
-#circuit.measure_all()
-
-#print(circuit)
-#results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
-#print(results)
-
-###### U #########
-circuit = U_a(a, b, n, x)
+circuit, operator, operator_inverse = controlled_multiplier(a, b, n, x)
 circuit.measure_all()
 
 print(circuit)
 results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
 print(results)
+
+###### U #########
+#circuit = U_a(a, b, n, x)
+#circuit.measure_all()
+
+#print(circuit)
+#results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
+#print(results)
 
 #### shor ####
 #circuit = shor_algo(a, n)
