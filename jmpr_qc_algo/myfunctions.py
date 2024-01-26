@@ -515,23 +515,26 @@ def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
     # apply swap gate
     for iter in range(x_bit_size - 2):
         U_a.swap(x_register[iter], b_register[register_size - (x_bit_size - 2) + iter])
+        U_a.reset(register_size + iter)
     for iter in range(register_size - (x_bit_size - 2)):
         U_a.swap(iter, iter + (x_bit_size - 2))
-    U_a.swap(register_size - (x_bit_size - 2), register_size - (x_bit_size - 2) + 1)
+    if register_size % 2 != 0:
+        U_a.swap(register_size - (x_bit_size - 2), register_size - (x_bit_size - 2) + 1)
 
-    U_a.append(c_mult_inv, x_register[:] + b_register[:] + aux_register[:])
+    #U_a.append(c_mult_inv, x_register[:] + b_register[:] + aux_register[:])
+
 
     circuit = circuit.compose(U_a, x_register[:] + b_register[:] + aux_register[:])
 
     return circuit
 
-a=7
+a=5
 b=0
 b_size = len(bin(b)) - 2 + 1
-n=15
+n=7
 n_size = len(bin(n)) - 2 + 1
 size = max(b_size, n_size)
-x=3
+x=4
 
 ######### draper ###########
 circuit, operator, operator_inverse = drappper_adder(a, b, n)
