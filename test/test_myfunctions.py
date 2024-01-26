@@ -180,12 +180,12 @@ def test_phase_estimation_jmp_2():
 def test_phase_estimation_operator_jmp():
 
     # Build the circuit
-    circuit_1 = myfunctions.phase_estimation_operator_jmp(3, Operator(TGate()))
-    circuit_2 = myfunctions.phase_estimation_operator_jmp(3, Operator(SGate()))
+    circuit_1 = myfunctions.phase_estimation_operator_jmp(3, Operator(TGate()), 1)
+    circuit_2 = myfunctions.phase_estimation_operator_jmp(3, Operator(SGate()), 1)
 
     phase = 1/3
     operator_test = Operator([[1, 0], [0, np.exp(2 * np.pi * 1j * phase)]])
-    circuit_3 = myfunctions.phase_estimation_operator_jmp(3, operator_test)
+    circuit_3 = myfunctions.phase_estimation_operator_jmp(3, operator_test, 1)
 
     # simulation of the state vector
     simulator = Aer.get_backend('qasm_simulator')
