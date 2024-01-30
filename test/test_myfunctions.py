@@ -230,17 +230,63 @@ def test_draper_adder():
     This function test Draper adder
     """
     # test parameters
-    a = 5
-    b = 9
 
-    # build circuit
-    circuit, operator, operator_inverse = myfunctions.drappper_adder(a, b)
-    circuit = circuit.compose(QFT(5, inverse=True, do_swaps=False))
-    circuit.measure_all()
+    for a in range(10):
+        for b in range(10):
 
-    simulator = Aer.get_backend('qasm_simulator')
-    results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
+            # compute size of the inputs numbers in binary
+            a_bin = bin(a)
+            b_bin = bin(b)
+            a_bit_size = len(a_bin)
+            b_bit_size = len(b_bin)
 
-    keys = list(results.keys())
+            register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1)
 
-    assert int(keys[-1], 2) == a + b
+            # build circuit
+            circuit, operator, operator_inverse = myfunctions.drappper_adder(a, b)
+            circuit = circuit.compose(QFT(register_size, inverse=True, do_swaps=False))
+            circuit.measure_all()
+
+            simulator = Aer.get_backend('qasm_simulator')
+            results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
+
+            keys = list(results.keys())
+
+            assert int(keys[-1], 2) == a + b
+
+
+def test_modular_adder():
+    """
+    This function test the modular adder
+    """
+
+    # test parameters
+    for n in [2, 4, 7]:
+        for a in range(10):
+            for b in range(n):
+
+                #recompute in casae a>n
+                if a >= n:
+                    a = a % n
+
+                # compute size of the inputs numbers in binary
+                a_bin = bin(a)
+                b_bin = bin(b)
+                n_bin = bin(n)
+                a_bit_size = len(a_bin)
+                b_bit_size = len(b_bin)
+                n_bit_size = len(n_bin)
+
+                register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1, n_bit_size - 2 + 1)  # 1 bit extra added
+
+                # build circuit
+                circuit, _, _ = myfunctions.modular_adder(a, b, n)
+                circuit = circuit.compose(QFT(register_size, inverse=True, do_swaps=False))
+                circuit.measure_all()
+
+                simulator = Aer.get_backend('qasm_simulator')
+                results = simulator.run(circuit.decompose(reps=10), shots=10).result().get_counts()
+
+                keys = list(results.keys())
+
+                assert int(keys[-1], 2) == (a + b) % n
