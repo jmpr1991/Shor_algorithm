@@ -34,9 +34,9 @@ def test_qft_jmp_1():
 
 def test_qft_jmp_2():
     """
-       This test check that the qft_jmp function build a QFT circuit on top of the input circuit. A list of Qubits is
-       provided in this test
-       """
+    This test check that the qft_jmp function build a QFT circuit on top of the input circuit. A list of Qubits is
+    provided in this test
+    """
     qubit_list = [0, 1, 2]
     qr = QuantumRegister(4)
     cr = ClassicalRegister(len(qubit_list))
@@ -290,3 +290,63 @@ def test_modular_adder():
                 keys = list(results.keys())
 
                 assert int(keys[-1], 2) == (a + b) % n
+
+
+def test_controlled_multiplier():
+    """
+    This function test the modular adder
+    """
+
+    # test parameters
+    for n in [5, 8]:
+        for x in [2, 5]:
+            for a in range(0, 10, 3):
+                for b in range(0, n, 3):
+
+                    #recompute in casae a>n
+                    if a >= n:
+                        a = a % n
+
+                    # compute size of the inputs numbers in binary
+                    a_bin = bin(a)
+                    b_bin = bin(b)
+                    n_bin = bin(n)
+                    a_bit_size = len(a_bin)
+                    b_bit_size = len(b_bin)
+                    n_bit_size = len(n_bin)
+
+                    register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1, n_bit_size - 2 + 1)  # 1 bit extra added
+
+                    # build circuit
+                    circuit, _, _ = myfunctions.controlled_multiplier(a, b, n, x)
+                    circuit.measure_all()
+
+                    simulator = Aer.get_backend('qasm_simulator')
+                    results = simulator.run(circuit.decompose(reps=10), shots=1).result().get_counts()
+
+                    keys = list(results.keys())
+
+                    assert int(keys[-1][0:register_size+1], 2) == (b + a*x) % n
+
+
+def test_U_a():
+    """
+    This function test the modular adder
+    """
+
+    # test parameters
+    for n in [5, 8]:
+        for x in [2, 5]:
+            for a in range(0, 10, 3):
+                for b in range(0, n, 3):
+
+                    # build circuit
+                    circuit = myfunctions.U_a(a, b, n, x)
+                    circuit.measure_all()
+
+                    simulator = Aer.get_backend('qasm_simulator')
+                    results = simulator.run(circuit.decompose(reps=10), shots=1).result().get_counts()
+
+                    keys = list(results.keys())
+
+                    assert int(keys[-1], 2) == (b + a*x) % n

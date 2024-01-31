@@ -259,6 +259,9 @@ def drappper_adder(a: 'int', b: 'int', n = 0):
 
         qubit += 1
 
+    circuit_adder.name = 'D-adder'
+    circuit_adder_inverse = circuit_adder.inverse()
+    circuit_adder_inverse.name = 'inverse D-adder'
     #compose both circuits
     operator_adder = Operator(circuit_adder).to_instruction()
     operator_adder.name = 'D-adder'
@@ -292,10 +295,8 @@ def modular_adder(a: 'int', b: 'int', n: 'int'):
     register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1, n_bit_size - 2 + 1) # 1 bit extra added
 
     b_register = QuantumRegister(register_size, name='b')
-    #c_register = QuantumRegister(2, name='c')
     aux_register = QuantumRegister(1, name='|0>')
     circuit = QuantumCircuit(b_register, aux_register)
-    #circuit.x(c_register)
 
     # build "b" inside the circuit
     qubit = 0
@@ -467,14 +468,14 @@ def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
     for iter in range(register_size):
         U_a.swap(x_register[iter], b_register[iter])
 
-    #for iter in range(register_size - (x_bit_size - 2)):
-    #    U_a.swap(b_register[iter], b_register[iter + (x_bit_size - 2)])
+    # last step after swap
+    #_, _, c_mult_inv = controlled_multiplier(a, x, n, (b + a * x) % n)
+    #U_a.append(c_mult_inv, x_register[:] + b_register[:] + aux_register[:])
+    U_a = U_a.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
+    _, _, adder_operator_inverse = drappper_adder(x, x, n)
+    U_a.append(adder_operator_inverse, b_register)
+    U_a = U_a.compose(QFT(num_qubits=register_size, inverse=True, do_swaps=False), b_register)
 
-    #for iter in range(register_size):
-    #    U_a.reset(b_register[register_size - 1 - iter])
-    _, _, c_mult_inv = controlled_multiplier(a, x, n, (b + a * x) % n)
-    U_a.append(c_mult_inv, x_register[:] + b_register[:] + aux_register[:])
-    #U_a_operator = Operator(U_a).to_instruction()
 
     circuit = circuit.compose(U_a, x_register[:] + b_register[:] + aux_register[:])
 
@@ -501,13 +502,14 @@ def shor_algo(a: 'int', n: 'int'):
     return circ
 
 
-a=3
-b=9
+a=9
+a_size = len(bin(a)) - 2 + 1
+b=0
 b_size = len(bin(b)) - 2 + 1
-n=11
+n=5
 n_size = len(bin(n)) - 2 + 1
-size = max(b_size, n_size)
-x=3
+size = max(b_size, n_size, a_size)
+x=2
 
 ######### draper ###########
 circuit, operator, operator_inverse = drappper_adder(a, b, n)
@@ -541,6 +543,7 @@ results = simulator.run(circuit.decompose(reps=6), shots=10).result().get_counts
 print(results)
 
 ###### U #########
+
 circuit = U_a(a, b, n, x)
 circuit.measure_all()
 
