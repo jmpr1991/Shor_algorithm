@@ -520,14 +520,20 @@ def shor_algo(a: 'int', n: 'int'):
     U_a_gate_control = U_a_gate.control(1)
 
    # Phase estimation procedure
-    for control_qubit in range(estimator_qubits):
+    qubit_count = 0
+    for control_qubit in reversed(range(estimator_qubits)):
 
         # create controlled operator
-        for iter in range(2**control_qubit):
-            circ.append(U_a_gate_control, [control_qubit, *range(estimator_qubits, estimator_qubits + phi_qubits)])
+        #for iter in range(2**qubit_count):
+        _, U_a_gate = U_a(a ** (2 ** qubit_count), 0, n, 1)
+        U_a_gate.name = f'U_{a}^{2 ** qubit_count}'
+        U_a_gate_control = U_a_gate.control(1)
+        circ.append(U_a_gate_control, [control_qubit, *range(estimator_qubits, estimator_qubits + phi_qubits)])
+
+        qubit_count += 1
 
     # add the inverse QFT
-    circ = circ.compose(QFT(num_qubits=estimator_qubits, inverse=True), estimator_register)
+    circ = circ.compose(QFT(num_qubits=estimator_qubits, inverse=True, do_swaps=False), estimator_register)
 
     # measure
     circ.measure(estimator_register, clasic_bits)
@@ -582,7 +588,8 @@ print(results)
 
 ###### U #########
 
-circuit, _ = U_a(a, b, n, x)
+circuit, gate = U_a(a, b, n, x)
+circuit.append(gate, range(11))
 circuit.measure_all()
 
 print(circuit)
