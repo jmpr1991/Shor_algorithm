@@ -3,6 +3,7 @@ from qiskit.quantum_info.operators import Operator
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit.tools.visualization import plot_histogram, plot_bloch_multivector
 from qiskit.circuit.library import QFT, TGate, SGate
+from qiskit.extensions import UnitaryGate
 
 import numpy as np
 from itertools import chain
@@ -259,9 +260,10 @@ def drappper_adder(a: 'int', b: 'int', n = 0):
 
         qubit += 1
 
-    circuit_adder.name = 'D-adder'
-    circuit_adder_inverse = circuit_adder.inverse()
-    circuit_adder_inverse.name = 'inverse D-adder'
+    gate_adder = circuit_adder.to_gate()
+    gate_adder.name = 'D-adder'
+    gate_adder_inverse = (circuit_adder.inverse()).to_gate()
+    gate_adder_inverse.name = 'inverse D-adder'
     #compose both circuits
     operator_adder = Operator(circuit_adder).to_instruction()
     operator_adder.name = 'D-adder'
@@ -270,7 +272,7 @@ def drappper_adder(a: 'int', b: 'int', n = 0):
     circuit = circuit.compose(circuit_adder)
     #circuit.append(operator_adder, range(register_size))
 
-    return circuit, operator_adder, operator_adder_inverse
+    return circuit, gate_adder, gate_adder_inverse
 
 
 def modular_adder(a: 'int', b: 'int', n: 'int'):
@@ -334,10 +336,12 @@ def modular_adder(a: 'int', b: 'int', n: 'int'):
     modular_adder_circuit.x(b_register[-1])
     modular_adder_circuit = modular_adder_circuit.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
     modular_adder_circuit.append(operator_adder_a, b_register)
-    modular_adder_circuit.name = 'mod_adder'
 
-    modular_adder_circuit_inverse = modular_adder_circuit.inverse()
-    modular_adder_circuit_inverse.name = 'inverse_mod_adder'
+    modular_adder_gate = modular_adder_circuit.to_gate()
+    modular_adder_gate.name = 'mod_adder'
+
+    modular_adder_gate_inverse = (modular_adder_circuit.inverse()).to_gate()
+    modular_adder_gate_inverse.name = 'inverse_mod_adder'
 
     # create modular adder operator
     #modular_adder_operator = Operator(modular_adder_circuit).to_instruction()
@@ -346,15 +350,21 @@ def modular_adder(a: 'int', b: 'int', n: 'int'):
     #operator_adder_inverse.name = 'inverse_mod_adder'
 
     #compose the final circuit
-    circuit.append(modular_adder_circuit, b_register[:] + aux_register[:])
+    circuit.append(modular_adder_gate, b_register[:] + aux_register[:])
 
-    return circuit, modular_adder_circuit, modular_adder_circuit_inverse
+    return circuit, modular_adder_gate, modular_adder_gate_inverse
 
 
 def controlled_multiplier(a: 'int', b: 'int', n: 'int', x: 'int'):
 
+    # recompute a in case a >= n to optimize number of qubits
+    if a >= n:
+        a_efective = a % n
+    else:
+        a_efective = a
+
     # compute size of the inputs numbers in binary
-    a_bin = bin(a)
+    a_bin = bin(a_efective)
     b_bin = bin(b)
     n_bin = bin(n)
     x_bin = bin(x)
@@ -404,9 +414,10 @@ def controlled_multiplier(a: 'int', b: 'int', n: 'int', x: 'int'):
     control_multiplier = control_multiplier.compose(QFT(num_qubits=register_size, inverse=True, do_swaps=False),
                                                         b_register)
 
-    control_multiplier.name = 'C-mult(a)'
-    control_multiplier_inverse = control_multiplier.inverse()
-    control_multiplier_inverse.name = 'C-mult(a)-inv'
+    control_multiplier_gate = control_multiplier.to_gate()
+    control_multiplier_gate.name = 'C-mult(a)'
+    control_multiplier_gate_inverse = (control_multiplier.inverse()).to_gate()
+    control_multiplier_gate_inverse.name = 'C-mult(a)-inv'
 
     #multiplier_operator = Operator(control_multiplier).to_instruction()
     #multiplier_operator.name = 'C-mult(a)'
@@ -416,12 +427,18 @@ def controlled_multiplier(a: 'int', b: 'int', n: 'int', x: 'int'):
     #compose the final circuit
     circuit = circuit.compose(control_multiplier, x_register[:] + b_register[:] + aux_register[:])
 
-    return circuit, control_multiplier, control_multiplier_inverse
+    return circuit, control_multiplier_gate, control_multiplier_gate_inverse
 
 def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
 
+    # recompute a in case a >= n to optimize number of qubits
+    if a >= n:
+        a_efective = a % n
+    else:
+        a_efective = a
+
     # compute size of the inputs numbers in binary
-    a_bin = bin(a)
+    a_bin = bin(a_efective)
     b_bin = bin(b)
     n_bin = bin(n)
     x_bin = bin(x)
@@ -476,40 +493,61 @@ def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
     U_a.append(adder_operator_inverse, b_register)
     U_a = U_a.compose(QFT(num_qubits=register_size, inverse=True, do_swaps=False), b_register)
 
+    U_gate = U_a.to_gate()
+    U_gate.name = 'U_a'
 
     circuit = circuit.compose(U_a, x_register[:] + b_register[:] + aux_register[:])
 
-    return circuit
+    return circuit, U_gate
 
 
 def shor_algo(a: 'int', n: 'int'):
 
-    U_a_circuit = U_a(a, 0, n, 1)
+    _, U_a_gate = U_a(a, 0, n, 1)
+    estimator_qubits = 4
+    phi_qubits = U_a_gate.num_qubits
 
-    estimator_qubits = 3
-    phi_qubits = U_a_circuit.num_qubits
-
-    estimator_register = QuantumRegister(estimator_qubits)
-    phi_register = QuantumRegister(phi_qubits)
+    estimator_register = QuantumRegister(estimator_qubits, name='est')
+    phi_register = QuantumRegister(phi_qubits, name='phi')
     clasic_bits = ClassicalRegister(estimator_qubits)
 
     # initialize circuit
     circ = QuantumCircuit(estimator_register, phi_register, clasic_bits)
-
     circ.h(estimator_register)
     circ.x(phi_register[0])
 
+    # create control gate
+    U_a_gate_control = U_a_gate.control(1)
+
+   # Phase estimation procedure
+    for control_qubit in range(estimator_qubits):
+
+        # create controlled operator
+        for iter in range(2**control_qubit):
+            circ.append(U_a_gate_control, [control_qubit, *range(estimator_qubits, estimator_qubits + phi_qubits)])
+
+    # add the inverse QFT
+    circ = circ.compose(QFT(num_qubits=estimator_qubits, inverse=True), estimator_register)
+
+    # measure
+    circ.measure(estimator_register, clasic_bits)
+
     return circ
 
-
-a=9
-a_size = len(bin(a)) - 2 + 1
+n=15
+a=7
+# recompute a in case a >= n to optimize number of qubits
+if a >= n:
+    a_efective = a % n
+else:
+    a_efective = a
+a_size = len(bin(a_efective)) - 2 + 1
 b=0
 b_size = len(bin(b)) - 2 + 1
-n=5
+
 n_size = len(bin(n)) - 2 + 1
 size = max(b_size, n_size, a_size)
-x=2
+x=1
 
 ######### draper ###########
 circuit, operator, operator_inverse = drappper_adder(a, b, n)
@@ -544,7 +582,7 @@ print(results)
 
 ###### U #########
 
-circuit = U_a(a, b, n, x)
+circuit, _ = U_a(a, b, n, x)
 circuit.measure_all()
 
 print(circuit)
@@ -552,8 +590,9 @@ results = simulator.run(circuit.decompose(reps=6), shots=100).result().get_count
 print(results)
 
 #### shor ####
-#circuit = shor_algo(a, n)
+circuit = shor_algo(a, n)
 
-#print(circuit)
-#results = simulator.run(circuit.decompose(reps=6)).result().get_counts()
-#print(results)
+print(circuit)
+results = simulator.run(circuit.decompose(reps=6), shots=500).result().get_counts()
+print(results)
+
