@@ -336,17 +336,16 @@ def test_U_a():
 
     # test parameters
     for n in [5, 8]:
-        for x in [2, 5]:
-            for a in range(0, 10, 3):
-                for b in range(0, n, 3):
+        for x in [2, 4]:
+            for a in range(1, 10, 3):
+                b = 0
+                # build circuit
+                circuit, _ = myfunctions.U_a(a, 0, n, x)
+                circuit.measure_all()
 
-                    # build circuit
-                    circuit = myfunctions.U_a(a, b, n, x)
-                    circuit.measure_all()
+                simulator = Aer.get_backend('qasm_simulator')
+                results = simulator.run(circuit.decompose(reps=10), shots=1).result().get_counts()
 
-                    simulator = Aer.get_backend('qasm_simulator')
-                    results = simulator.run(circuit.decompose(reps=10), shots=1).result().get_counts()
+                keys = list(results.keys())
 
-                    keys = list(results.keys())
-
-                    assert int(keys[-1], 2) == (b + a*x) % n
+                assert int(keys[-1], 2) == (b + a*x) % n

@@ -403,7 +403,7 @@ def controlled_multiplier(a: 'int', b: 'int', n: 'int', x: 'int'):
     control_multiplier = QuantumCircuit(x_register, b_register, aux_register)
     control_multiplier = control_multiplier.compose(QFT(num_qubits=register_size, inverse=False, do_swaps=False), b_register)
 
-    for iter in range(x_bit_size - 2):
+    for iter in range(register_size):
         # compute the modular adder operator
         _, modular_adder_circuit, _ = modular_adder(2**iter * a, b, n)
 
@@ -477,7 +477,7 @@ def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
     # build the U circuit
     U_a = QuantumCircuit(x_register, b_register, aux_register)
 
-    _, c_mult, _ = controlled_multiplier(a, b, n, x)
+    _, c_mult, c_mult_inv = controlled_multiplier(a, b, n, x)
 
     U_a.append(c_mult, x_register[:] + b_register[:] + aux_register[:])
 
@@ -486,12 +486,14 @@ def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
         U_a.swap(x_register[iter], b_register[iter])
 
     # last step after swap
-    #_, _, c_mult_inv = controlled_multiplier(a, x, n, (b + a * x) % n)
-    #U_a.append(c_mult_inv, x_register[:] + b_register[:] + aux_register[:])
-    U_a = U_a.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
-    _, _, adder_operator_inverse = drappper_adder(x, x, n)
-    U_a.append(adder_operator_inverse, b_register)
-    U_a = U_a.compose(QFT(num_qubits=register_size, inverse=True, do_swaps=False), b_register)
+    a_inv = pow(a, -1, n)
+    _, _, c_mult_inv = controlled_multiplier(a_inv, x, n, (b + a * x) % n)
+    U_a.append(c_mult_inv, x_register[:] + b_register[:] + aux_register[:])
+
+    #U_a = U_a.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
+    #_, _, adder_operator_inverse = drappper_adder(x, x, n)
+    #U_a.append(adder_operator_inverse, b_register)
+    #U_a = U_a.compose(QFT(num_qubits=register_size, inverse=True, do_swaps=False), b_register)
 
     U_gate = U_a.to_gate()
     U_gate.name = 'U_a'
@@ -516,12 +518,9 @@ def shor_algo(a: 'int', n: 'int'):
     circ.h(estimator_register)
     circ.x(phi_register[0])
 
-    # create control gate
-    U_a_gate_control = U_a_gate.control(1)
-
    # Phase estimation procedure
     qubit_count = 0
-    for control_qubit in reversed(range(estimator_qubits)):
+    for control_qubit in range(estimator_qubits):
 
         # create controlled operator
         #for iter in range(2**qubit_count):
@@ -533,7 +532,7 @@ def shor_algo(a: 'int', n: 'int'):
         qubit_count += 1
 
     # add the inverse QFT
-    circ = circ.compose(QFT(num_qubits=estimator_qubits, inverse=True, do_swaps=False), estimator_register)
+    circ = circ.compose(QFT(num_qubits=estimator_qubits, inverse=True), estimator_register)
 
     # measure
     circ.measure(estimator_register, clasic_bits)
@@ -560,10 +559,6 @@ circuit, operator, operator_inverse = drappper_adder(a, b, n)
 circuit = circuit.compose(QFT(size, inverse=True, do_swaps=False))
 circuit.measure_all()
 print(circuit)
-#QiskitRuntimeService.save_account(channel='ibm_quantum',
-#                               token='518b24050951bf78610b62057208bdfcb1aa3651c5f4d00604a8e721ead4863db9063637b548ea4529806585362d972f3337545d9aebf854ee0173ba36dd9cfc')
-#service = QiskitRuntimeService()
-#simulator = service.get_backend("ibmq_qasm_simulator")
 simulator = Aer.get_backend('qasm_simulator')
 results = simulator.run(circuit.decompose(reps=6), shots=1000).result().get_counts()
 print(results)
@@ -589,7 +584,7 @@ print(results)
 ###### U #########
 
 circuit, gate = U_a(a, b, n, x)
-circuit.append(gate, range(11))
+#circuit.append(gate, range(9))
 circuit.measure_all()
 
 print(circuit)
