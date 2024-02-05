@@ -1,17 +1,15 @@
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, Aer
 from qiskit.quantum_info.operators import Operator
-from qiskit_ibm_runtime import QiskitRuntimeService
-from qiskit.tools.visualization import plot_histogram, plot_bloch_multivector
-from qiskit.circuit.library import QFT, TGate, SGate
-from qiskit.extensions import UnitaryGate
+from qiskit.circuit.library import QFT
 
 import numpy as np
-from itertools import chain
-import matplotlib.pyplot as plt
+import pandas as pd
+from fractions import Fraction
+# import matplotlib.pyplot as plt
 
 
 def qft_jmp(q_circuit: 'QuantumCircuit', list_qubits: 'QuantumRegister' = None, qft_inverse: 'bool' = False,
-            do_swaps: 'bool' = True) -> 'classmethod':
+            do_swaps: 'bool' = True) -> 'QuantumCircuit':
     """
     Calculate the Quantum Fourier Transform of the input circuit
     and returns the circuit
@@ -42,7 +40,7 @@ def qft_jmp(q_circuit: 'QuantumCircuit', list_qubits: 'QuantumRegister' = None, 
         qft_circuit.barrier()
 
     # swap qubits
-    if do_swaps == True:
+    if do_swaps is True:
         n_qubits = np.floor(num_qubits/2)
         for qubit_i in range(int(n_qubits)):
             qft_circuit.swap(qubit_i, num_qubits-1-qubit_i)
@@ -60,7 +58,7 @@ def qft_jmp(q_circuit: 'QuantumCircuit', list_qubits: 'QuantumRegister' = None, 
     return circ
 
 
-def phase_estimation_jmp(estimator_register_size: 'int', phi_register_size: 'int', phase: 'float') -> 'classmethod':
+def phase_estimation_jmp(estimator_register_size: 'int', phi_register_size: 'int', phase: 'float') -> 'QuantumCircuit':
     """
     This function has been built to experiment before creating the function bellow
     :param estimator_register_size:
@@ -74,23 +72,23 @@ def phase_estimation_jmp(estimator_register_size: 'int', phi_register_size: 'int
     classical_register = ClassicalRegister(estimator_register_size, name='meas')
     phi_register = QuantumRegister(phi_register_size, name='phi')
 
-    circuit = QuantumCircuit(estimator_register, phi_register, classical_register)
+    circ = QuantumCircuit(estimator_register, phi_register, classical_register)
 
     # Initialization of the quantum register with H gates
-    circuit.h(estimator_register)
-    circuit.x(phi_register)
+    circ.h(estimator_register)
+    circ.x(phi_register)
 
     # Phase estimation procedure
     step = 0
     for control_qubit in range(estimator_register_size):
 
         for exponent in range(2**step):
-            circuit.cp(2*np.pi * phase, estimator_register[control_qubit], phi_register)
+            circ.cp(2*np.pi * phase, estimator_register[control_qubit], phi_register)
 
         step = step + 1
 
     # add the inverse QFT
-    phase_estimator_circuit = qft_jmp(circuit, estimator_register, qft_inverse=True)
+    phase_estimator_circuit = qft_jmp(circ, estimator_register, qft_inverse=True)
     phase_estimator_circuit.barrier()
 
     # Measure the estimation register
@@ -99,9 +97,11 @@ def phase_estimation_jmp(estimator_register_size: 'int', phi_register_size: 'int
     return phase_estimator_circuit
 
 
-def phase_estimation_operator_jmp(estimator_qubits: 'int', operator: 'class list', input_state: 'int') -> 'classmethod':
+def phase_estimation_operator_jmp(estimator_qubits: 'int', operator: 'class list', input_state: 'int') \
+        -> 'QuantumCircuit':
     """
     This function computes the phase estimation of the input operator provided a number of qubits for the estimator
+    :param input_state:
     :param estimator_qubits: number of qubits to estimate the phase/eigenvalue
     :param operator: operator to be used in the phase estimation algorithm
     :return: phase_estimation_circuit
@@ -114,19 +114,19 @@ def phase_estimation_operator_jmp(estimator_qubits: 'int', operator: 'class list
     classical_register = ClassicalRegister(estimator_qubits, name='meas')
     phi_register = QuantumRegister(phi_qubits, name='phi')
 
-    circuit = QuantumCircuit(estimator_register, phi_register, classical_register)
+    circ = QuantumCircuit(estimator_register, phi_register, classical_register)
 
     # Initialization of the quantum register with H gates
-    circuit.h(estimator_register)
+    circ.h(estimator_register)
 
     # build input state inside the circuit
     input_state_bin = bin(input_state)
     input_state_size = len(input_state_bin)
     qubit = 0
-    for iter in reversed(range(input_state_size)):
-        if input_state_bin[iter] == '1':
-            circuit.x(phi_register[qubit])
-        elif input_state_bin[iter] == 'b':
+    for i in reversed(range(input_state_size)):
+        if input_state_bin[i] == '1':
+            circ.x(phi_register[qubit])
+        elif input_state_bin[i] == 'b':
             break
         qubit += 1
 
@@ -141,12 +141,12 @@ def phase_estimation_operator_jmp(estimator_qubits: 'int', operator: 'class list
         control_operator = control_operator.control(1)
 
         # append the control operator
-        circuit.append(control_operator, [control_qubit, phi_register])
+        circ.append(control_operator, [control_qubit, phi_register])
 
         step = step + 1
 
     # add the inverse QFT
-    phase_estimator_circuit = qft_jmp(circuit, estimator_register, qft_inverse=True)
+    phase_estimator_circuit = qft_jmp(circ, estimator_register, qft_inverse=True)
     phase_estimator_circuit.barrier()
 
     # Measure the estimation register
@@ -155,68 +155,16 @@ def phase_estimation_operator_jmp(estimator_qubits: 'int', operator: 'class list
     return phase_estimator_circuit
 
 
-def modular_exponentiation_jmp(number_to_factor: 'int', number_module: 'int') -> 'list':
+def drappper_adder(a: 'int', b: 'int', n: 'int' = 0):
     """
-    This function computes the list of operator of the modular exponentiation to be used in Shor algorithm
-    :param number_to_factor: number which is going to be factorized
-    :param number_module: module number to be used in the computations
-    :return operators: list of operators following the modular exponentiation
-    """
-
-    # compute the number of bits of the number to factor
-    length = len(bin(number_to_factor)) - 2
-
-    # initialize state parameter
-    state = []
-    state_binary = []
-    initial_state = 1
-    state.append(initial_state)
-    state_binary.append(bin(initial_state))
-
-    iter = 1
-    while state[iter-1] != 1 or iter == 1:
-        exponentiate = (number_to_factor * state[iter-1]) % number_module
-        state.append(exponentiate)
-        state_binary.append(bin(state[iter]))
-
-        iter += 1
-    # eliminate the last element of the list. It is redundant (state[last]=1)
-    state.pop()
-    state_binary.pop()
-
-    # calculate the period
-    period = len(state)
-
-    circuit_size = int(np.ceil(np.log2(number_module)))
-
-    # create the equivalent circuit and operators
-    circuits = []
-    operators = []
-    for iter in range(period):
-        circuit_iter = QuantumCircuit(circuit_size)
-
-        qubit = 0
-        for iter_binary in reversed(range(len(state_binary[iter]))):
-
-            if state_binary[iter][iter_binary] == '1':
-                circuit_iter.x(qubit)
-            elif state_binary[iter_binary] == 'b':
-                break
-
-            circuits.append(circuit_iter)
-            qubit += 1
-
-        operators.append(Operator(circuits[iter]))
-
-    return operators, circuits
-
-
-def drappper_adder(a: 'int', b: 'int', n = 0):
-    """
-    This function add two integers in the b register using the fourier basis (Draper adder [addition on a Quantum Computer])
-    :param a: integer 1
-    :param b: integer 2
-    :return: circuit and operator with b register with value phi(a + b)
+    This is the controlled multiplier function as described in "circuit for Shor's algorithm using 2n+3 qubits" by
+    S. Beauegard. This function add two integers in the b register using the fourier basis (Draper adder [addition on a
+    Quantum Computer])
+    :param a: integer 1 to be added with 'b'
+    :param b: integer 2 to be added with 'a'
+    :param n: integer 3 optional parameter to be used to compute the size of the quantum register, useful for shor
+    algorithm
+    :return: circuit and operators with b register with value phi(a + b)
     """
 
     # compute size of the inputs numbers in binary
@@ -230,19 +178,19 @@ def drappper_adder(a: 'int', b: 'int', n = 0):
     register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1, n_bin_size - 2 + 1)
 
     b_register = QuantumRegister(register_size, name='b')
-    circuit = QuantumCircuit(b_register)
+    circ = QuantumCircuit(b_register)
 
     # build "b" inside the circuit
     qubit = 0
-    for iter in reversed(range(b_bit_size)):
-        if b_bin[iter] == '1':
-            circuit.x(b_register[qubit])
-        elif b_bin[iter] == 'b':
+    for i in reversed(range(b_bit_size)):
+        if b_bin[i] == '1':
+            circ.x(b_register[qubit])
+        elif b_bin[i] == 'b':
             break
         qubit += 1
 
     # Apply QFT
-    circuit = circuit.compose(QFT(num_qubits=register_size, do_swaps=False))
+    circ = circ.compose(QFT(num_qubits=register_size, do_swaps=False))
 
     # create the adder circuit
     circuit_adder = QuantumCircuit(b_register)
@@ -264,18 +212,27 @@ def drappper_adder(a: 'int', b: 'int', n = 0):
     gate_adder.name = 'D-adder'
     gate_adder_inverse = (circuit_adder.inverse()).to_gate()
     gate_adder_inverse.name = 'inverse D-adder'
-    #compose both circuits
+
+    # compose both circuits
     operator_adder = Operator(circuit_adder).to_instruction()
     operator_adder.name = 'D-adder'
     operator_adder_inverse = Operator(circuit_adder.inverse()).to_instruction()
     operator_adder_inverse.name = 'inverse D-adder'
-    circuit = circuit.compose(circuit_adder)
-    #circuit.append(operator_adder, range(register_size))
+    circ = circ.compose(circuit_adder)
 
-    return circuit, gate_adder, gate_adder_inverse
+    return circ, gate_adder, gate_adder_inverse
 
 
 def modular_adder(a: 'int', b: 'int', n: 'int'):
+    """
+    This is the modular adder function as described in "circuit for Shor's algorithm using 2n+3 qubits" by
+    S. BeauegardThis function add two integers in the b register using the fourier basis (Draper adder) and computed the
+    modulo of the result
+    :param a: integer 1 to be added with b
+    :param b: integer 2 to be added with a
+    :param n: integer 3 to be used to compute the module of a+b
+    :return: circuit and operators with b register with value (a + b)mod(n)
+    """
 
     # b should be less than n
     if b >= n:
@@ -294,29 +251,27 @@ def modular_adder(a: 'int', b: 'int', n: 'int'):
     b_bit_size = len(b_bin)
     n_bit_size = len(n_bin)
 
-    register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1, n_bit_size - 2 + 1) # 1 bit extra added
+    register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1, n_bit_size - 2 + 1)  # 1 bit extra added
 
     b_register = QuantumRegister(register_size, name='b')
     aux_register = QuantumRegister(1, name='|0>')
-    circuit = QuantumCircuit(b_register, aux_register)
+    circ = QuantumCircuit(b_register, aux_register)
 
     # build "b" inside the circuit
     qubit = 0
-    for iter in reversed(range(b_bit_size)):
-        if b_bin[iter] == '1':
-            circuit.x(b_register[qubit])
-        elif b_bin[iter] == 'b':
+    for i in reversed(range(b_bit_size)):
+        if b_bin[i] == '1':
+            circ.x(b_register[qubit])
+        elif b_bin[i] == 'b':
             break
         qubit += 1
 
     # Apply QFT
-    circuit = circuit.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
-    #circuit = circuit.compose(qft_jmp(q_circuit=circuit, list_qubits=b_register, do_swaps=False), b_register)
+    circ = circ.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
+    # circuit = circuit.compose(qft_jmp(q_circuit=circuit, list_qubits=b_register, do_swaps=False), b_register)
 
     # create the modular_adder circuit
     _, operator_adder_a, operator_adder_inverse_a = drappper_adder(a, b, n)
-    #control_operator_adder_a = operator_adder_a.control(2)
-    #control_operator_adder_inverse_a = operator_adder_inverse_a.control(2)
     _, operator_adder_n, operator_adder_inverse_n = drappper_adder(n, b)
     control_operator_adder_n = operator_adder_n.control(1)
 
@@ -337,34 +292,38 @@ def modular_adder(a: 'int', b: 'int', n: 'int'):
     modular_adder_circuit = modular_adder_circuit.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
     modular_adder_circuit.append(operator_adder_a, b_register)
 
+    # create gates to be used in subsequent function to support shor algorithm
     modular_adder_gate = modular_adder_circuit.to_gate()
     modular_adder_gate.name = 'mod_adder'
 
     modular_adder_gate_inverse = (modular_adder_circuit.inverse()).to_gate()
     modular_adder_gate_inverse.name = 'inverse_mod_adder'
 
-    # create modular adder operator
-    #modular_adder_operator = Operator(modular_adder_circuit).to_instruction()
-    #modular_adder_operator.name = 'mod_adder'
-    #operator_adder_inverse = Operator(modular_adder_circuit.inverse()).to_instruction()
-    #operator_adder_inverse.name = 'inverse_mod_adder'
+    # compose the final circuit
+    circ.append(modular_adder_gate, b_register[:] + aux_register[:])
 
-    #compose the final circuit
-    circuit.append(modular_adder_gate, b_register[:] + aux_register[:])
-
-    return circuit, modular_adder_gate, modular_adder_gate_inverse
+    return circ, modular_adder_gate, modular_adder_gate_inverse
 
 
 def controlled_multiplier(a: 'int', b: 'int', n: 'int', x: 'int'):
+    """
+    This is the controlled multiplier function as described in "circuit for Shor's algorithm using 2n+3 qubits" by
+    S. Beauegard. This gate take 3 inputs |x>, |b>, 'a' and 'n', and return |x>|(b+ax)mod(n)>
+    :param a: integer 1 to be added with b
+    :param b: integer 2 to be added with ax
+    :param n: integer 3 modulo to compute
+    :param x: integer 4 integer to multiply by a
+    :return: circuit and operators  with value (b + ax)mod(n)
+    """
 
-    # recompute a in case a >= n to optimize number of qubits
+    # recompute 'a' in case a >= n to optimize number of qubits
     if a >= n:
-        a_efective = a % n
+        a_effective = a % n
     else:
-        a_efective = a
+        a_effective = a
 
     # compute size of the inputs numbers in binary
-    a_bin = bin(a_efective)
+    a_bin = bin(a_effective)
     b_bin = bin(b)
     n_bin = bin(n)
     x_bin = bin(x)
@@ -377,68 +336,76 @@ def controlled_multiplier(a: 'int', b: 'int', n: 'int', x: 'int'):
     register_size = max(b_bit_size - 2 + 1, a_bit_size - 2 + 1, n_bit_size - 2 + 1)
 
     b_register = QuantumRegister(register_size, name='b')
-    x_register = QuantumRegister(register_size, name='x') # x_register has the same size as b_register to make easier future computations
+    # x_register has the same size as b_register to make easier future computations
+    x_register = QuantumRegister(register_size, name='x')
     aux_register = QuantumRegister(1, name='|0>')
-    circuit = QuantumCircuit(x_register, b_register, aux_register)
+    circ = QuantumCircuit(x_register, b_register, aux_register)
 
     # build "x" inside the circuit
     qubit = 0
-    for iter in reversed(range(x_bit_size)):
-        if x_bin[iter] == '1':
-            circuit.x(x_register[qubit])
-        elif x_bin[iter] == 'b':
+    for i in reversed(range(x_bit_size)):
+        if x_bin[i] == '1':
+            circ.x(x_register[qubit])
+        elif x_bin[i] == 'b':
             break
         qubit += 1
 
     # build "b" inside the circuit
     qubit = 0
-    for iter in reversed(range(b_bit_size)):
-        if b_bin[iter] == '1':
-            circuit.x(b_register[qubit])
-        elif b_bin[iter] == 'b':
+    for i in reversed(range(b_bit_size)):
+        if b_bin[i] == '1':
+            circ.x(b_register[qubit])
+        elif b_bin[i] == 'b':
             break
         qubit += 1
 
     # build the multiplier circuit
     control_multiplier = QuantumCircuit(x_register, b_register, aux_register)
-    control_multiplier = control_multiplier.compose(QFT(num_qubits=register_size, inverse=False, do_swaps=False), b_register)
+    control_multiplier = control_multiplier.compose(QFT(num_qubits=register_size, inverse=False, do_swaps=False),
+                                                    b_register)
 
-    for iter in range(register_size):
+    for i in range(register_size):
         # compute the modular adder operator
-        _, modular_adder_circuit, _ = modular_adder(2**iter * a, b, n)
+        _, modular_adder_circuit, _ = modular_adder(2**i * a, b, n)
 
         control_modular_adder_circuit = modular_adder_circuit.control(1)
 
-        control_multiplier.append(control_modular_adder_circuit, [iter, *range(register_size, 2 * register_size + 1)]) #x_bit_size -2
+        control_multiplier.append(control_modular_adder_circuit, [i, *range(register_size, 2 * register_size + 1)])  # x_bit_size -2
 
     control_multiplier = control_multiplier.compose(QFT(num_qubits=register_size, inverse=True, do_swaps=False),
-                                                        b_register)
+                                                    b_register)
 
+    # convert circuits to gates
     control_multiplier_gate = control_multiplier.to_gate()
     control_multiplier_gate.name = 'C-mult(a)'
     control_multiplier_gate_inverse = (control_multiplier.inverse()).to_gate()
     control_multiplier_gate_inverse.name = 'C-mult(a)-inv'
 
-    #multiplier_operator = Operator(control_multiplier).to_instruction()
-    #multiplier_operator.name = 'C-mult(a)'
-    #multiplier_operator_inverse = Operator(control_multiplier.inverse()).to_instruction()
-    #multiplier_operator_inverse.name = 'C-mult(a)-inv'
+    # compose the final circuit
+    circ = circ.compose(control_multiplier, x_register[:] + b_register[:] + aux_register[:])
 
-    #compose the final circuit
-    circuit = circuit.compose(control_multiplier, x_register[:] + b_register[:] + aux_register[:])
+    return circ, control_multiplier_gate, control_multiplier_gate_inverse
 
-    return circuit, control_multiplier_gate, control_multiplier_gate_inverse
 
 def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
+    """
+    This is the controlled U_a function as described in "circuit for Shor's algorithm using 2n+3 qubits" by
+    S. Beauegard. This gate take 3 inputs |x>, |b> (0 for show algo), 'a' and 'n', and return |(ax)mod(n)>
+    :param a: integer 1 to be added with b
+    :param b: integer 2 to be added with ax
+    :param n: integer 3 modulo to compute
+    :param x: integer 4 integer to multiply by a
+    :return: circuit and operator with value (ax)mod(n)
+    """
 
-    # recompute a in case a >= n to optimize number of qubits
+    # recompute 'a' in case a >= n to optimize number of qubits
     if a >= n:
-        a_efective = a % n
+        a_effective = a % n
     else:
-        a_efective = a
+        a_effective = a
 
     # compute size of the inputs numbers in binary
-    a_bin = bin(a_efective)
+    a_bin = bin(a_effective)
     b_bin = bin(b)
     n_bin = bin(n)
     x_bin = bin(x)
@@ -453,26 +420,25 @@ def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
     b_register = QuantumRegister(register_size, name='b')
     x_register = QuantumRegister(register_size, name='x')
     aux_register = QuantumRegister(1, name='|0>')
-    circuit = QuantumCircuit(x_register, b_register, aux_register)
+    circ = QuantumCircuit(x_register, b_register, aux_register)
 
     # build "x" inside the circuit
     qubit = 0
-    for iter in reversed(range(x_bit_size)):
-        if x_bin[iter] == '1':
-            circuit.x(x_register[qubit])
-        elif x_bin[iter] == 'b':
+    for i in reversed(range(x_bit_size)):
+        if x_bin[i] == '1':
+            circ.x(x_register[qubit])
+        elif x_bin[i] == 'b':
             break
         qubit += 1
 
     # build "b" inside the circuit
     qubit = 0
-    for iter in reversed(range(b_bit_size)):
-        if b_bin[iter] == '1':
-            circuit.x(b_register[qubit])
-        elif b_bin[iter] == 'b':
+    for i in reversed(range(b_bit_size)):
+        if b_bin[i] == '1':
+            circ.x(b_register[qubit])
+        elif b_bin[i] == 'b':
             break
         qubit += 1
-
 
     # build the U circuit
     U_a = QuantumCircuit(x_register, b_register, aux_register)
@@ -482,51 +448,46 @@ def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
     U_a.append(c_mult, x_register[:] + b_register[:] + aux_register[:])
 
     # apply swap gate
-    for iter in range(register_size):
-        U_a.swap(x_register[iter], b_register[iter])
+    for i in range(register_size):
+        U_a.swap(x_register[i], b_register[i])
 
     # last step after swap
     a_inv = pow(a, -1, n)
     _, _, c_mult_inv = controlled_multiplier(a_inv, x, n, (b + a * x) % n)
     U_a.append(c_mult_inv, x_register[:] + b_register[:] + aux_register[:])
 
-    #U_a = U_a.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
-    #_, _, adder_operator_inverse = drappper_adder(x, x, n)
-    #U_a.append(adder_operator_inverse, b_register)
-    #U_a = U_a.compose(QFT(num_qubits=register_size, inverse=True, do_swaps=False), b_register)
-
+    # convert to gate
     U_gate = U_a.to_gate()
     U_gate.name = 'U_a'
 
-    circuit = circuit.compose(U_a, x_register[:] + b_register[:] + aux_register[:])
+    circ = circ.compose(U_a, x_register[:] + b_register[:] + aux_register[:])
 
-    return circuit, U_gate
+    return circ, U_gate
 
 
 def shor_algo(a: 'int', n: 'int'):
 
-    _, U_a_gate = U_a(a, 0, n, 1)
-    estimator_qubits = 4
-    phi_qubits = U_a_gate.num_qubits
+    _, u_a_gate = U_a(a, 0, n, 1)
+    estimator_qubits = 8
+    phi_qubits = u_a_gate.num_qubits
 
     estimator_register = QuantumRegister(estimator_qubits, name='est')
     phi_register = QuantumRegister(phi_qubits, name='phi')
-    clasic_bits = ClassicalRegister(estimator_qubits)
+    classic_bits = ClassicalRegister(estimator_qubits)
 
     # initialize circuit
-    circ = QuantumCircuit(estimator_register, phi_register, clasic_bits)
+    circ = QuantumCircuit(estimator_register, phi_register, classic_bits)
     circ.h(estimator_register)
     circ.x(phi_register[0])
 
-   # Phase estimation procedure
+    # Phase estimation procedure
     qubit_count = 0
     for control_qubit in range(estimator_qubits):
 
         # create controlled operator
-        #for iter in range(2**qubit_count):
-        _, U_a_gate = U_a(a ** (2 ** qubit_count), 0, n, 1)
-        U_a_gate.name = f'U_{a}^{2 ** qubit_count}'
-        U_a_gate_control = U_a_gate.control(1)
+        _, u_a_gate = U_a(a ** (2 ** qubit_count), 0, n, 1)
+        u_a_gate.name = f'U_{a}^{2 ** qubit_count}'
+        U_a_gate_control = u_a_gate.control(1)
         circ.append(U_a_gate_control, [control_qubit, *range(estimator_qubits, estimator_qubits + phi_qubits)])
 
         qubit_count += 1
@@ -535,66 +496,45 @@ def shor_algo(a: 'int', n: 'int'):
     circ = circ.compose(QFT(num_qubits=estimator_qubits, inverse=True), estimator_register)
 
     # measure
-    circ.measure(estimator_register, clasic_bits)
+    circ.measure(estimator_register, classic_bits)
+    print(circ)
 
-    return circ
+    # compute results
+    simulator = Aer.get_backend('qasm_simulator')
+    counts = simulator.run(circ.decompose(reps=6), shots=500).result().get_counts()
+    print(counts)
 
-n=15
-a=7
-# recompute a in case a >= n to optimize number of qubits
-if a >= n:
-    a_efective = a % n
-else:
-    a_efective = a
-a_size = len(bin(a_efective)) - 2 + 1
-b=0
-b_size = len(bin(b)) - 2 + 1
+    # Code bellow imported from qiskit textbook
+    rows, measured_phases = [], []
+    for output in counts:
+        decimal = int(output, 2)  # Convert (base 2) string to decimal
+        phase = decimal / (2 ** estimator_qubits)  # Find corresponding eigenvalue
+        measured_phases.append(phase)
+        # Add these values to the rows in our table:
+        rows.append([f"{output}(bin) = {decimal:>3}(dec)",
+                     f"{decimal}/{2 ** estimator_qubits} = {phase:.2f}"])
+    # Print the rows in a table
+    headers = ["Register Output", "Phase"]
+    df = pd.DataFrame(rows, columns=headers)
+    print(df)
 
-n_size = len(bin(n)) - 2 + 1
-size = max(b_size, n_size, a_size)
-x=1
+    rows = []
+    for phase in measured_phases:
+        frac = Fraction(phase).limit_denominator(n)
+        rows.append([phase,
+                     f"{frac.numerator}/{frac.denominator}",
+                     frac.denominator])
+    # Print as a table
+    headers = ["Phase", "Fraction", "Guess for r"]
+    df = pd.DataFrame(rows, columns=headers)
+    print(df)
 
-######### draper ###########
-circuit, operator, operator_inverse = drappper_adder(a, b, n)
-circuit = circuit.compose(QFT(size, inverse=True, do_swaps=False))
-circuit.measure_all()
-print(circuit)
-simulator = Aer.get_backend('qasm_simulator')
-results = simulator.run(circuit.decompose(reps=6), shots=1000).result().get_counts()
-print(results)
-
-######## modular adder #######
-circuit, _, _ = modular_adder(a, b, n)
-circuit = circuit.compose(QFT(size, inverse=True, do_swaps=False), range(size))
-circuit.measure_all()
-
-print(circuit)
-results = simulator.run(circuit.decompose(reps=10), shots=1000).result().get_counts()
-print(results)
+    return circ, counts
 
 
-###### multiplier #########
-circuit, operator, operator_inverse = controlled_multiplier(a, b, n, x)
-circuit.measure_all()
-
-print(circuit)
-results = simulator.run(circuit.decompose(reps=6), shots=10).result().get_counts()
-print(results)
-
-###### U #########
-
-circuit, gate = U_a(a, b, n, x)
-#circuit.append(gate, range(9))
-circuit.measure_all()
-
-print(circuit)
-results = simulator.run(circuit.decompose(reps=6), shots=100).result().get_counts()
-print(results)
+n = 35
+a = 3
 
 #### shor ####
-circuit = shor_algo(a, n)
-
-print(circuit)
-results = simulator.run(circuit.decompose(reps=6), shots=500).result().get_counts()
-print(results)
+circuit, counts = shor_algo(a, n)
 

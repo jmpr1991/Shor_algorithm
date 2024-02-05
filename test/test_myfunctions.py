@@ -9,7 +9,7 @@ import numpy as np
 def test_qft_jmp_1():
     """
     This test check that the qft_jmp function build a QFT circuit on top of the input circuit. No list of qubits is
-    is provided in this test
+    provided in this test
     """
     qr = QuantumRegister(4)
     cr = ClassicalRegister(4)
@@ -67,7 +67,7 @@ def test_qft_jmp_3():
     cr = ClassicalRegister(5)
     circuit = QuantumCircuit(qr, cr)
 
-    #test case
+    # test case
     circuit.x([0, 2])
 
     full_circuit = myfunctions.qft_jmp(circuit,  qft_inverse=True)
@@ -76,11 +76,11 @@ def test_qft_jmp_3():
     # simulation of the state vector
     simulator = Aer.get_backend('statevector_simulator')
 
-    statevector = simulator.run(full_circuit).result().get_statevector()
-    statevector_test = simulator.run(full_circuit_test.decompose()).result().get_statevector()
+    state_vector = simulator.run(full_circuit).result().get_statevector()
+    state_vector_test = simulator.run(full_circuit_test.decompose()).result().get_statevector()
 
-    for i in range(len(statevector_test)):
-        assert np.round(statevector[i], 4) == np.round(statevector_test[i], 4)
+    for i in range(len(state_vector_test)):
+        assert np.round(state_vector[i], 4) == np.round(state_vector_test[i], 4)
 
 
 def test_qft_jmp_4():
@@ -265,7 +265,7 @@ def test_modular_adder():
         for a in range(10):
             for b in range(n):
 
-                #recompute in casae a>n
+                # recompute in case a>n
                 if a >= n:
                     a = a % n
 
@@ -294,7 +294,7 @@ def test_modular_adder():
 
 def test_controlled_multiplier():
     """
-    This function test the modular adder
+    This function test the controlled multiplier
     """
 
     # test parameters
@@ -303,7 +303,7 @@ def test_controlled_multiplier():
             for a in range(0, 10, 3):
                 for b in range(0, n, 3):
 
-                    #recompute in casae a>n
+                    # recompute in case a>n
                     if a >= n:
                         a = a % n
 
@@ -331,13 +331,13 @@ def test_controlled_multiplier():
 
 def test_U_a():
     """
-    This function test the modular adder
+    This function test the U_a circuit used for shor algorithm
     """
 
     # test parameters
     for n in [5, 8]:
         for x in [2, 4]:
-            for a in range(1, 10, 3):
+            for a in range(1, n, 2):
                 b = 0
                 # build circuit
                 circuit, _ = myfunctions.U_a(a, 0, n, x)
