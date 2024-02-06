@@ -520,7 +520,7 @@ def shor_algo(a: 'int', n: 'int'):
 
     rows = []
     for phase in measured_phases:
-        frac = Fraction(phase).limit_denominator(n)
+        frac = Fraction(phase).limit_denominator(np.floor(n/2))
         rows.append([phase,
                      f"{frac.numerator}/{frac.denominator}",
                      frac.denominator])
