@@ -1,6 +1,6 @@
 This is a Quantum computing library in where I am implementing different Quantum 
 algorithms to be used in Shor's algorithm using modular exponentiation, 
-as desccribed in "Circuit for Shor’s algorithm using 2n+3 qubits" 
+as described in "Circuit for Shor’s algorithm using 2n+3 qubits" 
 by Stephane Beauregard.
 
 The objective of this work is to better understand Quantum Computing foundations
