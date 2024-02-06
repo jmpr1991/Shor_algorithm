@@ -268,6 +268,7 @@ def modular_adder(a: 'int', b: 'int', n: 'int'):
 
     # Apply QFT
     circ = circ.compose(QFT(num_qubits=register_size, do_swaps=False), b_register)
+    # TODO: use the qft_jmp function instead the iqskit repository one
     # circuit = circuit.compose(qft_jmp(q_circuit=circuit, list_qubits=b_register, do_swaps=False), b_register)
 
     # create the modular_adder circuit
@@ -532,8 +533,8 @@ def shor_algo(a: 'int', n: 'int'):
     return circ, counts
 
 
-n = 35
-a = 3
+n = 15
+a = 7
 
 #### shor ####
 circuit, counts = shor_algo(a, n)
