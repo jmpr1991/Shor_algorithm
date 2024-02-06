@@ -533,9 +533,3 @@ def shor_algo(a: 'int', n: 'int'):
     return circ, counts
 
 
-n = 15
-a = 7
-
-#### shor ####
-circuit, counts = shor_algo(a, n)
-
