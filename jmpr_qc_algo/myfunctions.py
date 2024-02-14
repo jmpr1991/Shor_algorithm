@@ -466,10 +466,33 @@ def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
     return circ, U_gate
 
 
-def shor_algo(a: 'int', n: 'int'):
+def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
+
+    # request input if needed
+    if n is None:
+        print("Inject the number you want to factorize. "
+              "Remember to introduce a number which is the product of 2 primes (if test type 15)")
+        n = int(input())
+        print("")
+
+    if n % 2 == 0:
+        print("the number is multiple of 2")
+        exit()
+
+    if a is None:
+        print("Inject a number less than the number you want to factorize and with no common factors with it "
+              "(commonly called in literature a) (if test type 7)")
+        a = int(input())
+        print("")
+
+    if estimator_qubits is None:
+        print("Inject the number of qubits you want to use to estimate the factor. "
+              "Please note that the more qubits injected the more precision and the more computation time "
+              "(if test type 4)")
+        estimator_qubits = int(input())
+    print("Computation started. Please wait...")
 
     _, u_a_gate = U_a(a, 0, n, 1)
-    estimator_qubits = 8
     phi_qubits = u_a_gate.num_qubits
 
     estimator_register = QuantumRegister(estimator_qubits, name='est')
@@ -499,6 +522,8 @@ def shor_algo(a: 'int', n: 'int'):
     # measure
     circ.measure(estimator_register, classic_bits)
     print(circ)
+    print("")
+    print("The period is being computed now. Please wait...")
 
     # compute results
     simulator = Aer.get_backend('qasm_simulator')
@@ -506,6 +531,7 @@ def shor_algo(a: 'int', n: 'int'):
     print(counts)
 
     # Code bellow imported from qiskit textbook
+    # (https://github.com/Qiskit/textbook/blob/main/notebooks/ch-algorithms/shor.ipynb)
     rows, measured_phases = [], []
     for output in counts:
         decimal = int(output, 2)  # Convert (base 2) string to decimal
@@ -519,17 +545,38 @@ def shor_algo(a: 'int', n: 'int'):
     df = pd.DataFrame(rows, columns=headers)
     print(df)
 
-    rows = []
+    rows, r = [], []
     for phase in measured_phases:
         frac = Fraction(phase).limit_denominator(np.floor(n/2))
         rows.append([phase,
                      f"{frac.numerator}/{frac.denominator}",
                      frac.denominator])
+        r.append(int(frac.denominator))
     # Print as a table
     headers = ["Phase", "Fraction", "Guess for r"]
     df = pd.DataFrame(rows, columns=headers)
     print(df)
+    print("")
 
-    return circ, counts
+    # compute period
+    for i in range(len(r)):
+        if a**r[i] % n == 1 and r[i] > 0:
+            print(f"the period is {r[i]}")
+            period = r[i]
+            break
+    print("")
+    print("The factors are being computed now. Please wait...")
+
+    if period % 2 != 0:
+        print("period is not even number. "
+              "Please run the program with another value of a until obtaining an even number of r")
+        shor_algo(n=n, estimator_qubits=estimator_qubits)
+        exit()
+
+    # compute factors
+    factors = np.gcd(a ** (period / 2) - 1, n)
+    print(f"The factor of {n} are {factors}")
+
+    return
 
 
