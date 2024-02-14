@@ -458,12 +458,12 @@ def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
     U_a.append(c_mult_inv, x_register[:] + b_register[:] + aux_register[:])
 
     # convert to gate
-    U_gate = U_a.to_gate()
-    U_gate.name = 'U_a'
+    u_gate = U_a.to_gate()
+    u_gate.name = 'U_a'
 
     circ = circ.compose(U_a, x_register[:] + b_register[:] + aux_register[:])
 
-    return circ, U_gate
+    return circ, u_gate
 
 
 def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
@@ -492,9 +492,11 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
         estimator_qubits = int(input())
     print("Computation started. Please wait...")
 
+    # compute the modular exponentiation gate using predefined functions
     _, u_a_gate = U_a(a, 0, n, 1)
     phi_qubits = u_a_gate.num_qubits
 
+    # create quantum registers for the quantum circuit
     estimator_register = QuantumRegister(estimator_qubits, name='est')
     phi_register = QuantumRegister(phi_qubits, name='phi')
     classic_bits = ClassicalRegister(estimator_qubits)
@@ -511,15 +513,15 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
         # create controlled operator
         _, u_a_gate = U_a(a ** (2 ** qubit_count), 0, n, 1)
         u_a_gate.name = f'U_{a}^{2 ** qubit_count}'
-        U_a_gate_control = u_a_gate.control(1)
-        circ.append(U_a_gate_control, [control_qubit, *range(estimator_qubits, estimator_qubits + phi_qubits)])
+        u_a_gate_control = u_a_gate.control(1)
+        circ.append(u_a_gate_control, [control_qubit, *range(estimator_qubits, estimator_qubits + phi_qubits)])
 
         qubit_count += 1
 
     # add the inverse QFT
     circ = circ.compose(QFT(num_qubits=estimator_qubits, inverse=True), estimator_register)
 
-    # measure
+    # measure the estimators qubits
     circ.measure(estimator_register, classic_bits)
     print(circ)
     print("")
@@ -530,7 +532,7 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
     counts = simulator.run(circ.decompose(reps=6), shots=500).result().get_counts()
     print(counts)
 
-    # Code bellow imported from qiskit textbook
+    # The core of the code bellow for computing the period is imported from qiskit textbook - shor section
     # (https://github.com/Qiskit/textbook/blob/main/notebooks/ch-algorithms/shor.ipynb)
     rows, measured_phases = [], []
     for output in counts:
@@ -547,7 +549,7 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
 
     rows, r = [], []
     for phase in measured_phases:
-        frac = Fraction(phase).limit_denominator(np.floor(n/2))
+        frac = Fraction(phase).limit_denominator(int(np.floor(n/2)))
         rows.append([phase,
                      f"{frac.numerator}/{frac.denominator}",
                      frac.denominator])
@@ -559,6 +561,7 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
     print("")
 
     # compute period
+    period = 0
     for i in range(len(r)):
         if a**r[i] % n == 1 and r[i] > 0:
             print(f"the period is {r[i]}")
@@ -572,11 +575,14 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
               "Please run the program with another value of a until obtaining an even number of r")
         shor_algo(n=n, estimator_qubits=estimator_qubits)
         exit()
+    elif period == 0:
+        print("Computation went wrong. Please relaunch the program again injecting more qubits in the estimation")
+        exit()
 
     # compute factors
-    factors = np.gcd(a ** (period / 2) - 1, n)
-    print(f"The factor of {n} are {factors}")
+    factor1 = np.gcd(a ** int(period / 2) - 1, n)
+    factor2 = np.gcd(a ** int(period / 2) + 1, n)
+    print(f"The factor of {n} are {factor1} and {factor2}")
 
     return
-
 
