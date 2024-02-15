@@ -585,9 +585,8 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
         exit()
 
     # compute factors
-    factor1 = np.gcd(a ** int(period / 2) - 1, n)
-    factor2 = np.gcd(a ** int(period / 2) + 1, n)
-    print(f"The factors of {n} are {factor1} and {factor2}")
+    factors = [np.gcd(a ** int(period / 2) - 1, n), np.gcd(a ** int(period / 2) + 1, n)]
+    print(f"The factors of {n} are {factors[0]} and {factors[1]}")
 
-    return
+    return circ, period, factors
 
