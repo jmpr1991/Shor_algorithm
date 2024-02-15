@@ -1,7 +1,7 @@
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, Aer
 from qiskit.quantum_info.operators import Operator
 from qiskit.circuit.library import QFT
-from qiskit_ibm_runtime import QiskitRuntimeService
+# from qiskit_ibm_runtime import QiskitRuntimeService
 
 import numpy as np
 import pandas as pd
@@ -372,7 +372,8 @@ def controlled_multiplier(a: 'int', b: 'int', n: 'int', x: 'int'):
 
         control_modular_adder_circuit = modular_adder_circuit.control(1)
 
-        control_multiplier.append(control_modular_adder_circuit, [i, *range(register_size, 2 * register_size + 1)])  # x_bit_size -2
+        # x_bit_size -2
+        control_multiplier.append(control_modular_adder_circuit, [i, *range(register_size, 2 * register_size + 1)])
 
     control_multiplier = control_multiplier.compose(QFT(num_qubits=register_size, inverse=True, do_swaps=False),
                                                     b_register)
@@ -389,7 +390,7 @@ def controlled_multiplier(a: 'int', b: 'int', n: 'int', x: 'int'):
     return circ, control_multiplier_gate, control_multiplier_gate_inverse
 
 
-def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
+def mod_exp(a: 'int', b: 'int', n: 'int', x: 'int'):
     """
     This is the controlled U_a function as described in "circuit for Shor's algorithm using 2n+3 qubits" by
     S. Beauegard. This gate take 3 inputs |x>, |b> (0 for show algo), 'a' and 'n', and return |(ax)mod(n)>
@@ -443,31 +444,39 @@ def U_a(a: 'int', b: 'int', n: 'int', x: 'int'):
         qubit += 1
 
     # build the U circuit
-    U_a = QuantumCircuit(x_register, b_register, aux_register)
+    u_a = QuantumCircuit(x_register, b_register, aux_register)
 
     _, c_mult, c_mult_inv = controlled_multiplier(a, b, n, x)
 
-    U_a.append(c_mult, x_register[:] + b_register[:] + aux_register[:])
+    u_a.append(c_mult, x_register[:] + b_register[:] + aux_register[:])
 
     # apply swap gate
     for i in range(register_size):
-        U_a.swap(x_register[i], b_register[i])
+        u_a.swap(x_register[i], b_register[i])
 
     # last step after swap
     a_inv = pow(a, -1, n)
     _, _, c_mult_inv = controlled_multiplier(a_inv, x, n, (b + a * x) % n)
-    U_a.append(c_mult_inv, x_register[:] + b_register[:] + aux_register[:])
+    u_a.append(c_mult_inv, x_register[:] + b_register[:] + aux_register[:])
 
     # convert to gate
-    u_gate = U_a.to_gate()
+    u_gate = u_a.to_gate()
     u_gate.name = 'U_a'
 
-    circ = circ.compose(U_a, x_register[:] + b_register[:] + aux_register[:])
+    circ = circ.compose(u_a, x_register[:] + b_register[:] + aux_register[:])
 
     return circ, u_gate
 
 
 def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
+    """
+    This is a function used to factorize numbers compose b the multiplication of 2 primes
+    :param n: integer to factorize. Ideally the product of 2 prime numbers
+    :param a: random integer with no common factor with "n"
+    :param estimator_qubits: number of qubits requested to compute the period. The more qubits the more precision but
+    less speed
+    :return: circuit, period and factors
+    """
 
     # request input if needed
     if n is None:
@@ -495,7 +504,7 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
     print("")
 
     # compute the modular exponentiation gate using predefined functions
-    _, u_a_gate = U_a(a, 0, n, 1)
+    _, u_a_gate = mod_exp(a, 0, n, 1)
     phi_qubits = u_a_gate.num_qubits
 
     # create quantum registers for the quantum circuit
@@ -514,7 +523,7 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
     for control_qubit in range(estimator_qubits):
 
         # create controlled operator
-        _, u_a_gate = U_a(a ** (2 ** qubit_count), 0, n, 1)
+        _, u_a_gate = mod_exp(a ** (2 ** qubit_count), 0, n, 1)
         u_a_gate.name = f'U_{a}^{2 ** qubit_count}'
         u_a_gate_control = u_a_gate.control(1)
         circ.append(u_a_gate_control, [control_qubit, *range(estimator_qubits, estimator_qubits + phi_qubits)])
