@@ -560,7 +560,7 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
                      frac.denominator])
         r.append(int(frac.denominator))
     # Print as a table
-    headers = ["Phase", "Fraction", "Guess for r"]
+    headers = ["Phase", "Fraction", "Guess for period"]
     df = pd.DataFrame(rows, columns=headers)
     print(df)
     print("")
