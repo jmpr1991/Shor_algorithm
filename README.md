@@ -6,6 +6,9 @@ for Shor’s algorithm using 2n+3 qubits"**](https://arxiv.org/pdf/quant-ph/0205
 The objective of this work is to better understand Quantum Computing foundations and to get practice with Qiskit, so if 
 you are interested in using the code please consider that it could be optimized/improved.
 
+The shor functions developed in this repository uses mainly a set of other functions I have developed for such purpose. 
+I have tried to avoid the most as possible the use of predefined qiskit functions to enhance the learning experience.
+
 The code is currently working in IBM simulators but not in IBM real quantum hardware. I am working on it.
 
 # Shor's algorithm
