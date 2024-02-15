@@ -1,6 +1,7 @@
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, Aer
 from qiskit.quantum_info.operators import Operator
 from qiskit.circuit.library import QFT
+from qiskit_ibm_runtime import QiskitRuntimeService
 
 import numpy as np
 import pandas as pd
@@ -490,7 +491,8 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
               "Please note that the more qubits injected the more precision and the more computation time "
               "(if test type 4)")
         estimator_qubits = int(input())
-    print("Computation started. Please wait...")
+    print("Computation started.")
+    print("")
 
     # compute the modular exponentiation gate using predefined functions
     _, u_a_gate = U_a(a, 0, n, 1)
@@ -502,6 +504,7 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
     classic_bits = ClassicalRegister(estimator_qubits)
 
     # initialize circuit
+    print("The quantum circuit is being computed now. Please wait...")
     circ = QuantumCircuit(estimator_register, phi_register, classic_bits)
     circ.h(estimator_register)
     circ.x(phi_register[0])
@@ -528,6 +531,8 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
     print("The period is being computed now. Please wait...")
 
     # compute results
+    # service = QiskitRuntimeService()
+    # simulator = service.backend("ibm_osaka")
     simulator = Aer.get_backend('qasm_simulator')
     counts = simulator.run(circ.decompose(reps=6), shots=500).result().get_counts()
     print(counts)
@@ -582,7 +587,7 @@ def shor_algo(n: 'int' = None, a: 'int' = None, estimator_qubits: 'int' = None):
     # compute factors
     factor1 = np.gcd(a ** int(period / 2) - 1, n)
     factor2 = np.gcd(a ** int(period / 2) + 1, n)
-    print(f"The factor of {n} are {factor1} and {factor2}")
+    print(f"The factors of {n} are {factor1} and {factor2}")
 
     return
 
